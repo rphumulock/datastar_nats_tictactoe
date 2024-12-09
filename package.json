@@ -2,6 +2,7 @@
   "name": "northstar",
   "version": "0.2.2",
   "author": "Nicholas Zanghi",
+  "type": "module",
   "devDependencies": {
     "autoprefixer": "^10.4.20",
     "daisyui": "^4.12.10",

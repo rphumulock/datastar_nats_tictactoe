@@ -43,7 +43,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 		return fmt.Errorf("error creating key value: %w", err)
 	}
 
-	saveMVC := func(ctx context.Context, sessionID string, mvc *components.TodoMVC) error {
+	saveMVC := func(ctx context.Context, sessionID string, mvc *components.GameState) error {
 		b, err := json.Marshal(mvc)
 		if err != nil {
 			return fmt.Errorf("failed to marshal mvc: %w", err)
@@ -54,26 +54,20 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 		return nil
 	}
 
-	resetMVC := func(mvc *components.TodoMVC) {
-		mvc.Mode = components.TodoViewModeAll
-		mvc.Todos = []*components.Todo{
-			{Text: "Learn a backend language", Completed: true},
-			{Text: "Learn Datastar", Completed: false},
-			{Text: "Create Hypermedia", Completed: false},
-			{Text: "???", Completed: false},
-			{Text: "Profit", Completed: false},
-		}
-		mvc.EditingIdx = -1
+	resetMVC := func(mvc *components.GameState) {
+		mvc.Board = [9]string{}
+		mvc.XIsNext = true
+		mvc.Winner = ""
 	}
 
-	mvcSession := func(w http.ResponseWriter, r *http.Request) (string, *components.TodoMVC, error) {
+	mvcSession := func(w http.ResponseWriter, r *http.Request) (string, *components.GameState, error) {
 		ctx := r.Context()
 		sessionID, err := upsertSessionID(store, r, w)
 		if err != nil {
 			return "", nil, fmt.Errorf("failed to get session id: %w", err)
 		}
 
-		mvc := &components.TodoMVC{}
+		mvc := &components.GameState{}
 		if entry, err := kv.Get(ctx, sessionID); err != nil {
 			if err != jetstream.ErrKeyNotFound {
 				return "", nil, fmt.Errorf("failed to get key value: %w", err)
