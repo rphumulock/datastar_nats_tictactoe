@@ -15,7 +15,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/samber/lo"
 	"github.com/zangster300/northstar/web/components"
 	"github.com/zangster300/northstar/web/pages"
 )
@@ -90,8 +89,8 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 	})
 
 	router.Route("/api", func(apiRouter chi.Router) {
-		apiRouter.Route("/todos", func(todosRouter chi.Router) {
-			todosRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		apiRouter.Route("/game", func(gameRouter chi.Router) {
+			gameRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
 
 				sessionID, mvc, err := mvcSession(w, r)
 				if err != nil {
@@ -122,7 +121,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 							http.Error(w, err.Error(), http.StatusInternalServerError)
 							return
 						}
-						c := components.TodosMVCView(mvc)
+						c := components.GameMVCView(mvc)
 						if err := sse.MergeFragmentTempl(c); err != nil {
 							sse.ConsoleError(err)
 							return
@@ -131,7 +130,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 				}
 			})
 
-			todosRouter.Put("/reset", func(w http.ResponseWriter, r *http.Request) {
+			gameRouter.Put("/reset/{idx}", func(w http.ResponseWriter, r *http.Request) {
 				sessionID, mvc, err := mvcSession(w, r)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -145,51 +144,52 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 				}
 			})
 
-			todosRouter.Put("/cancel", func(w http.ResponseWriter, r *http.Request) {
+			// todosRouter.Put("/cancel", func(w http.ResponseWriter, r *http.Request) {
 
-				sessionID, mvc, err := mvcSession(w, r)
-				sse := datastar.NewSSE(w, r)
-				if err != nil {
-					sse.ConsoleError(err)
-					return
-				}
+			// 	sessionID, mvc, err := mvcSession(w, r)
+			// 	sse := datastar.NewSSE(w, r)
+			// 	if err != nil {
+			// 		sse.ConsoleError(err)
+			// 		return
+			// 	}
 
-				mvc.EditingIdx = -1
-				if err := saveMVC(r.Context(), sessionID, mvc); err != nil {
-					sse.ConsoleError(err)
-					return
-				}
-			})
+			// 	mvc.EditingIdx = -1
+			// 	if err := saveMVC(r.Context(), sessionID, mvc); err != nil {
+			// 		sse.ConsoleError(err)
+			// 		return
+			// 	}
+			// })
 
-			todosRouter.Put("/mode/{mode}", func(w http.ResponseWriter, r *http.Request) {
+			// todosRouter.Put("/mode/{mode}", func(w http.ResponseWriter, r *http.Request) {
 
-				sessionID, mvc, err := mvcSession(w, r)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
+			// 	sessionID, mvc, err := mvcSession(w, r)
+			// 	if err != nil {
+			// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+			// 		return
+			// 	}
 
-				modeStr := chi.URLParam(r, "mode")
-				modeRaw, err := strconv.Atoi(modeStr)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusBadRequest)
-					return
-				}
+			// 	modeStr := chi.URLParam(r, "mode")
+			// 	modeRaw, err := strconv.Atoi(modeStr)
+			// 	if err != nil {
+			// 		http.Error(w, err.Error(), http.StatusBadRequest)
+			// 		return
+			// 	}
 
-				mode := components.TodoViewMode(modeRaw)
-				if mode < components.TodoViewModeAll || mode > components.TodoViewModeCompleted {
-					http.Error(w, "invalid mode", http.StatusBadRequest)
-					return
-				}
+			// 	mode := components.TodoViewMode(modeRaw)
+			// 	if mode < components.TodoViewModeAll || mode > components.TodoViewModeCompleted {
+			// 		http.Error(w, "invalid mode", http.StatusBadRequest)
+			// 		return
+			// 	}
 
-				mvc.Mode = mode
-				if err := saveMVC(r.Context(), sessionID, mvc); err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-			})
+			// 	mvc.Mode = mode
+			// 	if err := saveMVC(r.Context(), sessionID, mvc); err != nil {
+			// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+			// 		return
+			// 	}
+			// })
 
-			todosRouter.Route("/{idx}", func(todoRouter chi.Router) {
+			gameRouter.Route("/{idx}", func(gameRouter chi.Router) {
+
 				routeIndex := func(w http.ResponseWriter, r *http.Request) (int, error) {
 					idx := chi.URLParam(r, "idx")
 					i, err := strconv.Atoi(idx)
@@ -200,7 +200,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 					return i, nil
 				}
 
-				todoRouter.Post("/toggle", func(w http.ResponseWriter, r *http.Request) {
+				gameRouter.Post("/toggle", func(w http.ResponseWriter, r *http.Request) {
 					sessionID, mvc, err := mvcSession(w, r)
 
 					sse := datastar.NewSSE(w, r)
@@ -215,104 +215,90 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 						return
 					}
 
-					if i < 0 {
-						setCompletedTo := false
-						for _, todo := range mvc.Todos {
-							if !todo.Completed {
-								setCompletedTo = true
-								break
-							}
-						}
-						for _, todo := range mvc.Todos {
-							todo.Completed = setCompletedTo
-						}
-					} else {
-						todo := mvc.Todos[i]
-						todo.Completed = !todo.Completed
-					}
+					mvc.Board[i] = "X"
 
 					saveMVC(r.Context(), sessionID, mvc)
 				})
 
-				todoRouter.Route("/edit", func(editRouter chi.Router) {
-					editRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
-						sessionID, mvc, err := mvcSession(w, r)
-						if err != nil {
-							http.Error(w, err.Error(), http.StatusInternalServerError)
-							return
-						}
+				// 	todoRouter.Route("/edit", func(editRouter chi.Router) {
+				// 		editRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
+				// 			sessionID, mvc, err := mvcSession(w, r)
+				// 			if err != nil {
+				// 				http.Error(w, err.Error(), http.StatusInternalServerError)
+				// 				return
+				// 			}
 
-						i, err := routeIndex(w, r)
-						if err != nil {
-							return
-						}
+				// 			i, err := routeIndex(w, r)
+				// 			if err != nil {
+				// 				return
+				// 			}
 
-						mvc.EditingIdx = i
-						saveMVC(r.Context(), sessionID, mvc)
-					})
+				// 			mvc.EditingIdx = i
+				// 			saveMVC(r.Context(), sessionID, mvc)
+				// 		})
 
-					editRouter.Put("/", func(w http.ResponseWriter, r *http.Request) {
-						type Store struct {
-							Input string `json:"input"`
-						}
-						store := &Store{}
+				// 		editRouter.Put("/", func(w http.ResponseWriter, r *http.Request) {
+				// 			type Store struct {
+				// 				Input string `json:"input"`
+				// 			}
+				// 			store := &Store{}
 
-						if err := datastar.ReadSignals(r, store); err != nil {
-							http.Error(w, err.Error(), http.StatusBadRequest)
-							return
-						}
+				// 			if err := datastar.ReadSignals(r, store); err != nil {
+				// 				http.Error(w, err.Error(), http.StatusBadRequest)
+				// 				return
+				// 			}
 
-						if store.Input == "" {
-							return
-						}
+				// 			if store.Input == "" {
+				// 				return
+				// 			}
 
-						sessionID, mvc, err := mvcSession(w, r)
-						if err != nil {
-							http.Error(w, err.Error(), http.StatusInternalServerError)
-							return
-						}
+				// 			sessionID, mvc, err := mvcSession(w, r)
+				// 			if err != nil {
+				// 				http.Error(w, err.Error(), http.StatusInternalServerError)
+				// 				return
+				// 			}
 
-						i, err := routeIndex(w, r)
-						if err != nil {
-							return
-						}
+				// 			i, err := routeIndex(w, r)
+				// 			if err != nil {
+				// 				return
+				// 			}
 
-						if i >= 0 {
-							mvc.Todos[i].Text = store.Input
-						} else {
-							mvc.Todos = append(mvc.Todos, &components.Todo{
-								Text:      store.Input,
-								Completed: false,
-							})
-						}
-						mvc.EditingIdx = -1
+				// 			if i >= 0 {
+				// 				mvc.Todos[i].Text = store.Input
+				// 			} else {
+				// 				mvc.Todos = append(mvc.Todos, &components.Todo{
+				// 					Text:      store.Input,
+				// 					Completed: false,
+				// 				})
+				// 			}
+				// 			mvc.EditingIdx = -1
 
-						saveMVC(r.Context(), sessionID, mvc)
+				// 			saveMVC(r.Context(), sessionID, mvc)
 
-					})
-				})
+				// 		})
+				// 	})
 
-				todoRouter.Delete("/", func(w http.ResponseWriter, r *http.Request) {
-					i, err := routeIndex(w, r)
-					if err != nil {
-						return
-					}
+				// 	todoRouter.Delete("/", func(w http.ResponseWriter, r *http.Request) {
+				// 		i, err := routeIndex(w, r)
+				// 		if err != nil {
+				// 			return
+				// 		}
 
-					sessionID, mvc, err := mvcSession(w, r)
-					if err != nil {
-						http.Error(w, err.Error(), http.StatusInternalServerError)
-						return
-					}
+				// 		sessionID, mvc, err := mvcSession(w, r)
+				// 		if err != nil {
+				// 			http.Error(w, err.Error(), http.StatusInternalServerError)
+				// 			return
+				// 		}
 
-					if i >= 0 {
-						mvc.Todos = append(mvc.Todos[:i], mvc.Todos[i+1:]...)
-					} else {
-						mvc.Todos = lo.Filter(mvc.Todos, func(todo *components.Todo, i int) bool {
-							return !todo.Completed
-						})
-					}
-					saveMVC(r.Context(), sessionID, mvc)
-				})
+				// 		if i >= 0 {
+				// 			mvc.Todos = append(mvc.Todos[:i], mvc.Todos[i+1:]...)
+				// 		} else {
+				// 			mvc.Todos = lo.Filter(mvc.Todos, func(todo *components.Todo, i int) bool {
+				// 				return !todo.Completed
+				// 			})
+				// 		}
+				// 		saveMVC(r.Context(), sessionID, mvc)
+				// 	})
 			})
 		})
 	})
