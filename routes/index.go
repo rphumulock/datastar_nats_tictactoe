@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	datastar "github.com/starfederation/datastar/code/go/sdk"
@@ -17,6 +18,12 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/zangster300/northstar/web/components"
 	"github.com/zangster300/northstar/web/pages"
+)
+
+// Global connection counter
+var (
+	connectionCounter = make(map[string]int)
+	mu                sync.Mutex // To ensure thread-safe access
 )
 
 func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.Server) error {
@@ -98,17 +105,43 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 					return
 				}
 
+				// Increment connection count for the session
+				mu.Lock()
+				connectionCounter[sessionID]++
+				currentConnections := connectionCounter[sessionID]
+				mu.Unlock()
+
+				// Block if more than 2 connections for this session
+				if currentConnections > 2 {
+					mu.Lock()
+					connectionCounter[sessionID]--
+					mu.Unlock()
+					http.Error(w, "Only 2 tabs are allowed for this session", http.StatusForbidden)
+					return
+				}
+
+				// Setup SSE
 				sse := datastar.NewSSE(w, r)
 
 				// Watch for updates
 				ctx := r.Context()
 				watcher, err := kv.Watch(ctx, sessionID)
 				if err != nil {
+					mu.Lock()
+					connectionCounter[sessionID]--
+					mu.Unlock()
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				defer watcher.Stop()
+				defer func() {
+					// Stop watcher and decrement connection count
+					watcher.Stop()
+					mu.Lock()
+					connectionCounter[sessionID]--
+					mu.Unlock()
+				}()
 
+				// Start watching for updates
 				for {
 					select {
 					case <-ctx.Done():
@@ -130,7 +163,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 				}
 			})
 
-			gameRouter.Put("/reset/{idx}", func(w http.ResponseWriter, r *http.Request) {
+			gameRouter.Post("/reset", func(w http.ResponseWriter, r *http.Request) {
 				sessionID, mvc, err := mvcSession(w, r)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -215,7 +248,13 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 						return
 					}
 
-					mvc.Board[i] = "X"
+					if mvc.XIsNext {
+						mvc.Board[i] = "X"
+						mvc.XIsNext = false
+					} else {
+						mvc.Board[i] = "O"
+						mvc.XIsNext = true
+					}
 
 					saveMVC(r.Context(), sessionID, mvc)
 				})
