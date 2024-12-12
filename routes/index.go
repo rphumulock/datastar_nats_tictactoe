@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -18,6 +19,20 @@ import (
 	"github.com/zangster300/northstar/web/components"
 	"github.com/zangster300/northstar/web/pages"
 )
+
+type GameState struct {
+	PlayerCount int          `json:"player_count"`
+	Status      string       `json:"status"` // "waiting", "ongoing", "completed"
+	Board       [3][3]string `json:"board"`  // Optional: Initial empty board
+	XIsNext     bool         // Indicates if X is the next player
+	Winner      string       // The winner of the game ("X" or "O")
+}
+
+type Player struct {
+	PlayerID string `json:"player_id"` // Unique identifier for the player
+	Name     string `json:"name"`      // Player's name
+	GameID   string `json:"game_id"`   // The ID of the game the player is currently in (empty if not in a game)
+}
 
 func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.Server) error {
 	nc, err := ns.Client()
@@ -42,39 +57,81 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 		return fmt.Errorf("error creating key value: %w", err)
 	}
 
-	saveMVC := func(ctx context.Context, sessionID string, mvc *components.GameState) error {
-		b, err := json.Marshal(mvc)
+	// saveMVC := func(ctx context.Context, sessionID string, mvc *components.GameState) error {
+	// 	b, err := json.Marshal(mvc)
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to marshal mvc: %w", err)
+	// 	}
+	// 	if _, err := kv.Put(ctx, sessionID, b); err != nil {
+	// 		return fmt.Errorf("failed to put key value: %w", err)
+	// 	}
+	// 	return nil
+	// }
+
+	createNewGame := func(ctx context.Context, sessionID string) error {
+		// Create a new game instance with initial state
+		game := &GameState{
+			PlayerCount: 1,         // Start with 1 player
+			Status:      "waiting", // Initial status of the game
+		}
+
+		// Generate a new game ID
+		gameId := toolbelt.NextEncodedID()
+
+		// Marshal the game struct to JSON
+		b, err := json.Marshal(game)
 		if err != nil {
-			return fmt.Errorf("failed to marshal mvc: %w", err)
+			return fmt.Errorf("failed to marshal game: %w", err)
 		}
-		if _, err := kv.Put(ctx, sessionID, b); err != nil {
-			return fmt.Errorf("failed to put key value: %w", err)
+
+		// Store the game in the key-value store
+		if _, err := kv.Put(ctx, gameId, b); err != nil {
+			return fmt.Errorf("failed to put key-value: %w", err)
 		}
+
+		player := &Player{
+			PlayerID: sessionID,
+			Name:     "Player-" + sessionID,
+			GameID:   gameId,
+		}
+
+		// Marshal the game struct to JSON
+		b, err = json.Marshal(player)
+		if err != nil {
+			return fmt.Errorf("failed to marshal game: %w", err)
+		}
+		if _, err := kv.Put(ctx, "players", b); err != nil {
+			return fmt.Errorf("failed to put key-value: %w", err)
+		}
+
+		// Optionally log the successful creation of the game
+		log.Printf("Game created successfully with ID: %s", gameId)
+
 		return nil
 	}
 
-	resetMVC := func(mvc *components.GameState, sessionID string) {
-		mvc.Players = [2]string{"Player-" + sessionID, ""}
-		mvc.Board = [9]string{}
-		mvc.XIsNext = true
-		mvc.Winner = ""
-	}
+	// resetMVC := func(mvc *GameState, sessionID string) {
+	// 	mvc.Players = [2]string{"Player-" + sessionID, ""}
+	// 	mvc.Board = [9]string{}
+	// 	mvc.XIsNext = true
+	// 	mvc.Winner = ""
+	// }
 
-	mvcSession := func(w http.ResponseWriter, r *http.Request) (string, *components.GameState, error) {
+	mvcSession := func(w http.ResponseWriter, r *http.Request) (string, *GameState, error) {
 		ctx := r.Context()
 		sessionID, err := upsertSessionID(store, r, w)
 		if err != nil {
 			return "", nil, fmt.Errorf("failed to get session id: %w", err)
 		}
 
-		mvc := &components.GameState{}
+		mvc := &GameState{}
 		if entry, err := kv.Get(ctx, sessionID); err != nil {
 			if err != jetstream.ErrKeyNotFound {
 				return "", nil, fmt.Errorf("failed to get key value: %w", err)
 			}
 			resetMVC(mvc, sessionID)
 
-			if err := saveMVC(ctx, sessionID, mvc); err != nil {
+			if err := createNewGame(ctx, sessionID, mvc); err != nil {
 				return "", nil, fmt.Errorf("failed to save mvc: %w", err)
 			}
 		} else {

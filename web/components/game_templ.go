@@ -34,17 +34,7 @@ import datastar "github.com/starfederation/datastar/code/go/sdk"
 // 	Mode       TodoViewMode `json:"mode"`
 // }
 
-type Game struct {
-	ID string // The winner of the game ("X" or "O")
-}
-
 // ------------------------------------------
-type GameState struct {
-	Players [2]string // Two players
-	Board   [9]string // 9-cell board initialized with empty strings
-	XIsNext bool      // Indicates if X is the next player
-	Winner  string    // The winner of the game ("X" or "O")
-}
 
 //	templ TodosMVCView(mvc *GameState) {
 //		<div id="todos-container" class="h-full relative border border-solid border-primary rounded p-2 my-2 mx-28">
@@ -177,7 +167,7 @@ func GameMVCView(mvc *GameState) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.PostSSE("/api/game/reset"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 147, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 148, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -219,7 +209,7 @@ func CurrentGamesMVCView(str string) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(str)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 158, Col: 7}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 159, Col: 7}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -304,7 +294,7 @@ func Cell(cell string, i int) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.PostSSE("/api/game/%d/toggle", i))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 191, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 192, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -327,7 +317,7 @@ func Cell(cell string, i int) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(cell)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 196, Col: 8}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 197, Col: 8}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
