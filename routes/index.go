@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	datastar "github.com/starfederation/datastar/code/go/sdk"
@@ -15,15 +14,10 @@ import (
 	"github.com/delaneyj/toolbelt/embeddednats"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/zangster300/northstar/web/components"
 	"github.com/zangster300/northstar/web/pages"
-)
-
-// Global connection counter
-var (
-	connectionCounter = make(map[string]int)
-	mu                sync.Mutex // To ensure thread-safe access
 )
 
 func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.Server) error {
@@ -38,8 +32,8 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 	}
 
 	kv, err := js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
-		Bucket:      "todos",
-		Description: "Datastar Todos",
+		Bucket:      "games",
+		Description: "Datastar Tic Tac Toe Game",
 		Compression: true,
 		TTL:         time.Hour,
 		MaxBytes:    16 * 1024 * 1024,
@@ -60,7 +54,8 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 		return nil
 	}
 
-	resetMVC := func(mvc *components.GameState) {
+	resetMVC := func(mvc *components.GameState, sessionID string) {
+		mvc.Players = [2]string{sessionID, ""}
 		mvc.Board = [9]string{}
 		mvc.XIsNext = true
 		mvc.Winner = ""
@@ -78,7 +73,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 			if err != jetstream.ErrKeyNotFound {
 				return "", nil, fmt.Errorf("failed to get key value: %w", err)
 			}
-			resetMVC(mvc)
+			resetMVC(mvc, sessionID)
 
 			if err := saveMVC(ctx, sessionID, mvc); err != nil {
 				return "", nil, fmt.Errorf("failed to save mvc: %w", err)
@@ -105,43 +100,17 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 					return
 				}
 
-				// Increment connection count for the session
-				mu.Lock()
-				connectionCounter[sessionID]++
-				currentConnections := connectionCounter[sessionID]
-				mu.Unlock()
-
-				// Block if more than 2 connections for this session
-				if currentConnections > 2 {
-					mu.Lock()
-					connectionCounter[sessionID]--
-					mu.Unlock()
-					http.Error(w, "Only 2 tabs are allowed for this session", http.StatusForbidden)
-					return
-				}
-
-				// Setup SSE
 				sse := datastar.NewSSE(w, r)
 
 				// Watch for updates
 				ctx := r.Context()
 				watcher, err := kv.Watch(ctx, sessionID)
 				if err != nil {
-					mu.Lock()
-					connectionCounter[sessionID]--
-					mu.Unlock()
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				defer func() {
-					// Stop watcher and decrement connection count
-					watcher.Stop()
-					mu.Lock()
-					connectionCounter[sessionID]--
-					mu.Unlock()
-				}()
+				defer watcher.Stop()
 
-				// Start watching for updates
 				for {
 					select {
 					case <-ctx.Done():
@@ -163,63 +132,19 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 				}
 			})
 
-			gameRouter.Post("/reset", func(w http.ResponseWriter, r *http.Request) {
+			gameRouter.Put("/reset/{idx}", func(w http.ResponseWriter, r *http.Request) {
 				sessionID, mvc, err := mvcSession(w, r)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
 
-				resetMVC(mvc)
+				resetMVC(mvc, sessionID)
 				if err := saveMVC(r.Context(), sessionID, mvc); err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
 			})
-
-			// todosRouter.Put("/cancel", func(w http.ResponseWriter, r *http.Request) {
-
-			// 	sessionID, mvc, err := mvcSession(w, r)
-			// 	sse := datastar.NewSSE(w, r)
-			// 	if err != nil {
-			// 		sse.ConsoleError(err)
-			// 		return
-			// 	}
-
-			// 	mvc.EditingIdx = -1
-			// 	if err := saveMVC(r.Context(), sessionID, mvc); err != nil {
-			// 		sse.ConsoleError(err)
-			// 		return
-			// 	}
-			// })
-
-			// todosRouter.Put("/mode/{mode}", func(w http.ResponseWriter, r *http.Request) {
-
-			// 	sessionID, mvc, err := mvcSession(w, r)
-			// 	if err != nil {
-			// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-			// 		return
-			// 	}
-
-			// 	modeStr := chi.URLParam(r, "mode")
-			// 	modeRaw, err := strconv.Atoi(modeStr)
-			// 	if err != nil {
-			// 		http.Error(w, err.Error(), http.StatusBadRequest)
-			// 		return
-			// 	}
-
-			// 	mode := components.TodoViewMode(modeRaw)
-			// 	if mode < components.TodoViewModeAll || mode > components.TodoViewModeCompleted {
-			// 		http.Error(w, "invalid mode", http.StatusBadRequest)
-			// 		return
-			// 	}
-
-			// 	mvc.Mode = mode
-			// 	if err := saveMVC(r.Context(), sessionID, mvc); err != nil {
-			// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-			// 		return
-			// 	}
-			// })
 
 			gameRouter.Route("/{idx}", func(gameRouter chi.Router) {
 
@@ -248,97 +173,82 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 						return
 					}
 
-					if mvc.XIsNext {
-						mvc.Board[i] = "X"
-						mvc.XIsNext = false
-					} else {
-						mvc.Board[i] = "O"
-						mvc.XIsNext = true
-					}
+					mvc.Board[i] = "X"
 
 					saveMVC(r.Context(), sessionID, mvc)
 				})
-
-				// 	todoRouter.Route("/edit", func(editRouter chi.Router) {
-				// 		editRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				// 			sessionID, mvc, err := mvcSession(w, r)
-				// 			if err != nil {
-				// 				http.Error(w, err.Error(), http.StatusInternalServerError)
-				// 				return
-				// 			}
-
-				// 			i, err := routeIndex(w, r)
-				// 			if err != nil {
-				// 				return
-				// 			}
-
-				// 			mvc.EditingIdx = i
-				// 			saveMVC(r.Context(), sessionID, mvc)
-				// 		})
-
-				// 		editRouter.Put("/", func(w http.ResponseWriter, r *http.Request) {
-				// 			type Store struct {
-				// 				Input string `json:"input"`
-				// 			}
-				// 			store := &Store{}
-
-				// 			if err := datastar.ReadSignals(r, store); err != nil {
-				// 				http.Error(w, err.Error(), http.StatusBadRequest)
-				// 				return
-				// 			}
-
-				// 			if store.Input == "" {
-				// 				return
-				// 			}
-
-				// 			sessionID, mvc, err := mvcSession(w, r)
-				// 			if err != nil {
-				// 				http.Error(w, err.Error(), http.StatusInternalServerError)
-				// 				return
-				// 			}
-
-				// 			i, err := routeIndex(w, r)
-				// 			if err != nil {
-				// 				return
-				// 			}
-
-				// 			if i >= 0 {
-				// 				mvc.Todos[i].Text = store.Input
-				// 			} else {
-				// 				mvc.Todos = append(mvc.Todos, &components.Todo{
-				// 					Text:      store.Input,
-				// 					Completed: false,
-				// 				})
-				// 			}
-				// 			mvc.EditingIdx = -1
-
-				// 			saveMVC(r.Context(), sessionID, mvc)
-
-				// 		})
-				// 	})
-
-				// 	todoRouter.Delete("/", func(w http.ResponseWriter, r *http.Request) {
-				// 		i, err := routeIndex(w, r)
-				// 		if err != nil {
-				// 			return
-				// 		}
-
-				// 		sessionID, mvc, err := mvcSession(w, r)
-				// 		if err != nil {
-				// 			http.Error(w, err.Error(), http.StatusInternalServerError)
-				// 			return
-				// 		}
-
-				// 		if i >= 0 {
-				// 			mvc.Todos = append(mvc.Todos[:i], mvc.Todos[i+1:]...)
-				// 		} else {
-				// 			mvc.Todos = lo.Filter(mvc.Todos, func(todo *components.Todo, i int) bool {
-				// 				return !todo.Completed
-				// 			})
-				// 		}
-				// 		saveMVC(r.Context(), sessionID, mvc)
-				// 	})
 			})
+
+			apiRouter.Route("/games", func(gameRouter chi.Router) {
+				gameRouter.Get("/list", func(w http.ResponseWriter, r *http.Request) {
+					ctx := r.Context()
+
+					// Initialize SSE
+					sse := datastar.NewSSE(w, r)
+
+					// Start watching the key-value store for updates (new games)
+					watcher, err := kv.Watch(ctx, "")
+					if err != nil {
+						http.Error(w, fmt.Sprintf("failed to start watcher: %v", err), http.StatusInternalServerError)
+						return
+					}
+					defer watcher.Stop()
+
+					for {
+						select {
+						case <-ctx.Done():
+							return
+						case entry := <-watcher.Updates():
+							if entry == nil {
+								continue
+							}
+							if err := json.Unmarshal(entry.Value(), game); err != nil {
+								http.Error(w, err.Error(), http.StatusInternalServerError)
+								return
+							}
+							c := components.CurrentGamesMVCView()
+							if err := sse.MergeFragmentTempl(c); err != nil {
+								sse.ConsoleError(err)
+								return
+							}
+						}
+					}
+
+					ctx := r.Context()
+
+					// Fetch all available keys (game IDs) from the KV store
+					keys, err := kv.Keys(ctx)
+					if err != nil {
+						http.Error(w, fmt.Sprintf("failed to fetch game keys: %v", err), http.StatusInternalServerError)
+						return
+					}
+
+					var games []Game
+
+					// Loop through each key and retrieve the game data
+					for _, key := range keys {
+						entry, err := kv.Get(ctx, key)
+						if err != nil {
+							// Skip keys that may have been deleted or cause errors
+							if err == nats.ErrKeyNotFound {
+								continue
+							}
+							http.Error(w, fmt.Sprintf("failed to get game data for key %s: %v", key, err), http.StatusInternalServerError)
+							return
+						}
+
+						var game Game
+						if err := json.Unmarshal(entry.Value(), &game); err != nil {
+							http.Error(w, fmt.Sprintf("failed to unmarshal game data for key %s: %v", key, err), http.StatusInternalServerError)
+							return
+						}
+
+						game.ID = key // Set the ID based on the key
+						games = append(games, game)
+					}
+				})
+			})
+
 		})
 	})
 

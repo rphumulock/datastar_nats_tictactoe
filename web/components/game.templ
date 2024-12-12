@@ -28,9 +28,14 @@ import datastar "github.com/starfederation/datastar/code/go/sdk"
 
 // ------------------------------------------
 type GameState struct {
+	Players [2]string // Two players
 	Board   [9]string // 9-cell board initialized with empty strings
 	XIsNext bool      // Indicates if X is the next player
 	Winner  string    // The winner of the game ("X" or "O")
+}
+
+type Game struct {
+	ID  string    // The winner of the game ("X" or "O")
 }
 
 // templ TodosMVCView(mvc *GameState) {
@@ -127,17 +132,10 @@ type GameState struct {
 // 	</div>
 // }
 templ GameMVCView(mvc *GameState) {
-	<div id="game-container" class="h-full relative border border-solid border-primary rounded p-2 my-2 mx-28">
+	<div id="game-container" class="h-full w-3/4 relative border border-solid border-primary rounded p-2 my-2 mx-28">
 		<div class="flex flex-col w-full h-full gap-4">
 			<section class="flex flex-col w-full h-full gap-2">
-				<header class="flex items-baseline gap-2 justify-center">
-					<h1 class="text-4xl font-bold uppercase font-brand md:text-6xl text-primary">
-						Multiplayer Tic-Tac-Toe
-					</h1>
-				</header>
-				<!-- Tic Tac Toe Board -->
 				<div class="grid grid-cols-3 grid-rows-3 gap-2 w-full h-full mt-4">
-					<!-- Loop over the cells of the board -->
 					for i, cell := range mvc.Board {
 						@Cell(cell, i)
 					}
@@ -152,6 +150,12 @@ templ GameMVCView(mvc *GameState) {
 				</button>
 			</footer>
 		</div>
+	</div>
+}
+
+templ CurrentGamesMVCView(game *Game) {
+	<div id="game-container" class="h-full w-3/4 relative border border-solid border-primary rounded p-2 my-2 mx-28">
+		{ game.ID }
 	</div>
 }
 
