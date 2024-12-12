@@ -14,7 +14,6 @@ import (
 	"github.com/delaneyj/toolbelt/embeddednats"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
-	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/zangster300/northstar/web/components"
 	"github.com/zangster300/northstar/web/pages"
@@ -55,7 +54,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 	}
 
 	resetMVC := func(mvc *components.GameState, sessionID string) {
-		mvc.Players = [2]string{sessionID, ""}
+		mvc.Players = [2]string{"Player-" + sessionID, ""}
 		mvc.Board = [9]string{}
 		mvc.XIsNext = true
 		mvc.Winner = ""
@@ -114,6 +113,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 				for {
 					select {
 					case <-ctx.Done():
+						kv.Delete(ctx, sessionID)
 						return
 					case entry := <-watcher.Updates():
 						if entry == nil {
@@ -187,7 +187,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 					sse := datastar.NewSSE(w, r)
 
 					// Start watching the key-value store for updates (new games)
-					watcher, err := kv.Watch(ctx, "")
+					watcher, err := kv.WatchAll(ctx)
 					if err != nil {
 						http.Error(w, fmt.Sprintf("failed to start watcher: %v", err), http.StatusInternalServerError)
 						return
@@ -202,11 +202,12 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 							if entry == nil {
 								continue
 							}
-							if err := json.Unmarshal(entry.Value(), game); err != nil {
-								http.Error(w, err.Error(), http.StatusInternalServerError)
-								return
-							}
-							c := components.CurrentGamesMVCView()
+							// game := &components.Game{}
+							// if err := json.Unmarshal(entry.Value(), game); err != nil {
+							// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+							// 	return
+							// }
+							c := components.CurrentGamesMVCView(string(entry.Value()))
 							if err := sse.MergeFragmentTempl(c); err != nil {
 								sse.ConsoleError(err)
 								return
@@ -214,38 +215,6 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 						}
 					}
 
-					ctx := r.Context()
-
-					// Fetch all available keys (game IDs) from the KV store
-					keys, err := kv.Keys(ctx)
-					if err != nil {
-						http.Error(w, fmt.Sprintf("failed to fetch game keys: %v", err), http.StatusInternalServerError)
-						return
-					}
-
-					var games []Game
-
-					// Loop through each key and retrieve the game data
-					for _, key := range keys {
-						entry, err := kv.Get(ctx, key)
-						if err != nil {
-							// Skip keys that may have been deleted or cause errors
-							if err == nats.ErrKeyNotFound {
-								continue
-							}
-							http.Error(w, fmt.Sprintf("failed to get game data for key %s: %v", key, err), http.StatusInternalServerError)
-							return
-						}
-
-						var game Game
-						if err := json.Unmarshal(entry.Value(), &game); err != nil {
-							http.Error(w, fmt.Sprintf("failed to unmarshal game data for key %s: %v", key, err), http.StatusInternalServerError)
-							return
-						}
-
-						game.ID = key // Set the ID based on the key
-						games = append(games, game)
-					}
 				})
 			})
 

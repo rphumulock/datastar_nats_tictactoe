@@ -26,16 +26,16 @@ import datastar "github.com/starfederation/datastar/code/go/sdk"
 // 	Mode       TodoViewMode `json:"mode"`
 // }
 
+type Game struct {
+	ID string // The winner of the game ("X" or "O")
+}
+
 // ------------------------------------------
 type GameState struct {
 	Players [2]string // Two players
 	Board   [9]string // 9-cell board initialized with empty strings
 	XIsNext bool      // Indicates if X is the next player
 	Winner  string    // The winner of the game ("X" or "O")
-}
-
-type Game struct {
-	ID  string    // The winner of the game ("X" or "O")
 }
 
 // templ TodosMVCView(mvc *GameState) {
@@ -153,9 +153,9 @@ templ GameMVCView(mvc *GameState) {
 	</div>
 }
 
-templ CurrentGamesMVCView(game *Game) {
-	<div id="game-container" class="h-full w-3/4 relative border border-solid border-primary rounded p-2 my-2 mx-28">
-		{ game.ID }
+templ CurrentGamesMVCView(str string) {
+	<div id="games-list-container" class="h-full w-3/4 relative border border-solid border-primary rounded p-2 my-2 mx-28">
+		{ str }
 	</div>
 }
 
