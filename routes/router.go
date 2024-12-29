@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"time"
 
-	"github.com/delaneyj/toolbelt"
 	"github.com/delaneyj/toolbelt/embeddednats"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
@@ -15,10 +15,12 @@ import (
 )
 
 func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (cleanup func() error, err error) {
-	natsPort, err := toolbelt.FreePort()
+	natsPort, err := 33823, nil
 	if err != nil {
 		return nil, fmt.Errorf("error getting free port: %w", err)
 	}
+
+	log.Printf("Starting on Nats server %d", natsPort)
 
 	ns, err := embeddednats.New(ctx, embeddednats.WithNATSServerOptions(&natsserver.Options{
 		JetStream: true,

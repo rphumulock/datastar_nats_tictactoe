@@ -1,6 +1,9 @@
 package components 
 
-import datastar "github.com/starfederation/datastar/code/go/sdk"
+import (
+	"fmt"
+	datastar "github.com/starfederation/datastar/code/go/sdk"
+)
 
 // "fmt"
 
@@ -28,6 +31,7 @@ import datastar "github.com/starfederation/datastar/code/go/sdk"
 
 // ------------------------------------------
 type GameState struct {
+	Id      string    `json:"id"`
 	Players [2]string // Players' Ids
 	Board   [9]string // 9-cell board initialized with empty strings
 	XIsNext bool      // Indicates if X is the next player
@@ -35,7 +39,7 @@ type GameState struct {
 }
 
 type Player struct {
-	Id   string `json:"id"`
+	Id     string `json:"id"`
 	GameId string `json:"gameId"`
 }
 
@@ -154,9 +158,18 @@ templ GameMVCView(mvc *GameState) {
 	</div>
 }
 
-templ CurrentGamesMVCView(str string) {
-	<div id="games-list-container" class="h-full w-3/4 relative border border-solid border-primary rounded p-2 my-2 mx-28">
-		{ str }
+templ RemoveGame(mvc *GameState) {
+	{{ id := fmt.Sprintf("game-%s", mvc.Id) }}
+	<div id={ id }>
+		{ mvc.Id }
+	</div>
+}
+
+templ AddGame(mvc *GameState) {
+	{{ id := fmt.Sprintf("game-%s", mvc.Id) }}
+	<div id={ id }>
+		{ mvc.Id }
+		<button class="btn btn-primary" data-on-click={ datastar.DeleteSSE("/api/game/%s/delete", mvc.Id) }>Delete</button>
 	</div>
 }
 
