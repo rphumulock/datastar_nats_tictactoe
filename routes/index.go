@@ -107,47 +107,25 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 		// Watch for updates to the "games" bucket
 		apiRouter.Route("/games", func(gameRouter chi.Router) {
 			gameRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				// Initialize SSE
 				sse := datastar.NewSSE(w, r)
+
+				log.Printf("Live update: Key=%s, Value=%s", "s", "s")
 
 				ctx := r.Context()
 
-				log.Printf("Historical event: Key=%s, Operation=%v", "games", jetstream.KeyValuePut)
-
-				watcher, err := kv.Watch(ctx, "", jetstream.IncludeHistory())
+				watcher, err := kv.WatchAll(ctx, jetstream.UpdatesOnly())
 				if err != nil {
-					log.Printf("Historical event: Key")
-
 					http.Error(w, fmt.Sprintf("Failed to start watcher: %v", err), http.StatusInternalServerError)
 					return
 				}
-				log.Printf("Historical event: Key")
-
 				defer watcher.Stop()
-
-				log.Printf("Historical event: Kasdasdasdey")
-
-				isReplaying := true
 
 				for {
 					select {
 					case <-ctx.Done():
 						return
 					case entry := <-watcher.Updates():
-						log.Printf("Historical event: Key=%s, Operation=%v", entry.Key(), entry.Operation())
-
 						if entry == nil {
-							// Transition from replay to live updates
-							isReplaying = false
-							log.Println("Finished replaying history")
-							continue
-						}
-
-						log.Printf("Historical event: Key=%s, Operation=%v", entry.Key(), entry.Operation())
-
-						if isReplaying {
-							// Process historical events differently (optional)
-							log.Printf("Historical event: Key=%s, Operation=%v", entry.Key(), entry.Operation())
 							continue
 						}
 
