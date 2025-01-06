@@ -136,6 +136,34 @@ type Player struct {
 // 		</div>
 // 	</div>
 // }
+templ InitGame(sessionId string) {
+	<div id="main-container" class="flex flex-col items-center justify-center min-h-screen bg-base-200 p-6">
+		<!-- Welcome Message -->
+		<div class="text-center text-3xl font-bold mb-6">
+			Welcome, { sessionId }
+		</div>
+		<!-- Create Game Button -->
+		<button
+			class="btn btn-primary px-12 py-4 text-lg font-medium transition-all duration-200 shadow-lg hover:bg-primary-focus"
+			data-on-click="$get('/api/game')"
+		>
+			Create Game
+		</button>
+		<!-- Games List Section -->
+		<section class="w-full max-w-4xl p-6 bg-secondary border-4 border-accent shadow-lg rounded-lg mt-10 h-[32rem] overflow-y-scroll">
+			<h2 class="text-2xl font-semibold text-gray-800 mb-6">Active Games</h2>
+			<div
+				id="games-list-container"
+				class="space-y-6"
+				data-on-load="$get('/api/games')"
+			>
+				<!-- Placeholder for dynamically loaded games -->
+				<p class="text-gray-600 text-center">Loading games...</p>
+			</div>
+		</section>
+	</div>
+}
+
 templ GameMVCView(mvc *GameState) {
 	<div id="game-container" class="h-full w-3/4 relative border border-solid border-primary rounded p-2 my-2 mx-28">
 		<div class="flex flex-col w-full h-full gap-4">
@@ -167,8 +195,10 @@ templ RemoveGame(mvc *GameState) {
 
 templ AddGame(mvc *GameState) {
 	{{ id := fmt.Sprintf("game-%s", mvc.Id) }}
-	<div id={ id }>
-		{ mvc.Id }
+	<div id={ id } class="p-4 bg-gray-100 rounded-lg shadow">
+		<h3 class="text-lg font-semibold text-gray-700">{ mvc.Id }</h3>
+		<p class="text-gray-600">Hosted by: User456</p>
+		<button class="btn btn-primary mt-4 w-full">Join Game</button>
 		<button class="btn btn-primary" data-on-click={ datastar.DeleteSSE("/api/game/%s/delete", mvc.Id) }>Delete</button>
 	</div>
 }

@@ -8,9 +8,12 @@ package pages
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/zangster300/northstar/web/layouts"
+import (
+	"github.com/zangster300/northstar/web/components"
+	"github.com/zangster300/northstar/web/layouts"
+)
 
-func Index(title string) templ.Component {
+func Index(sessionId string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -43,13 +46,28 @@ func Index(title string) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 1)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"flex flex-col w-full min-h-screen bg-base-200\"><nav class=\"w-full bg-primary text-white py-4 px-6 shadow\"><div class=\"container mx-auto flex items-center justify-between\"><span class=\"text-xl font-semibold\">Tic Tac Toe</span><div id=\"user-session-container\"></div></div></nav><!-- Main Content --><div class=\"flex flex-grow items-center justify-center\"><div id=\"main-container\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if sessionId != "" {
+				templ_7745c5c3_Err = components.InitGame(sessionId).Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			} else {
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<!-- No session --> <button class=\"btn btn-primary px-8 text-lg text-center\" data-on-click=\"$get(&#39;/api/login&#39;)\">Login</button>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return templ_7745c5c3_Err
 		})
-		templ_7745c5c3_Err = layouts.Base(title).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = layouts.Base().Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

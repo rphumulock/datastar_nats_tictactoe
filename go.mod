@@ -4,18 +4,16 @@ go 1.23.3
 
 require (
 	github.com/go-chi/chi/v5 v5.1.0
-	golang.org/x/sync v0.9.0
+	golang.org/x/sync v0.10.0
 )
 
 require (
-	github.com/Jeffail/gabs/v2 v2.7.0
-	github.com/a-h/templ v0.2.793
+	github.com/a-h/templ v0.3.819
 	github.com/benbjohnson/hashfs v0.2.2
 	github.com/delaneyj/toolbelt v0.3.15
 	github.com/gorilla/sessions v1.4.0
 	github.com/nats-io/nats-server/v2 v2.10.22
 	github.com/nats-io/nats.go v1.37.0
-	github.com/samber/lo v1.47.0
 	github.com/starfederation/datastar v0.20.1
 )
 
@@ -44,6 +42,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rzajac/clock v0.2.0 // indirect
 	github.com/rzajac/zflake v0.8.0 // indirect
+	github.com/samber/lo v1.47.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/ysmood/fetchup v0.2.4 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
@@ -53,7 +52,7 @@ require (
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	golang.org/x/crypto v0.29.0 // indirect
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
-	golang.org/x/sys v0.27.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.20.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
 	google.golang.org/protobuf v1.35.2 // indirect

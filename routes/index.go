@@ -19,6 +19,11 @@ import (
 	"github.com/zangster300/northstar/web/pages"
 )
 
+type User struct {
+	SessionID string `json:"session_id"` // Unique session ID for the user
+	GameID    string `json:"game_id"`    // List of games the user is in
+}
+
 func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.Server) error {
 	// Create NATS client
 	nc, err := ns.Client()
@@ -33,8 +38,20 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 	}
 
 	// Create or update the "games" KV bucket
-	kv, err := js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
+	gamesKV, err := js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
 		Bucket:      "games",
+		Description: "Datastar Tic Tac Toe Game",
+		Compression: true,
+		TTL:         time.Hour,
+		MaxBytes:    16 * 1024 * 1024,
+	})
+	if err != nil {
+		return fmt.Errorf("error creating key value: %w", err)
+	}
+
+	// Create or update the "games" KV bucket
+	userKV, err := js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
+		Bucket:      "users",
 		Description: "Datastar Tic Tac Toe Game",
 		Compression: true,
 		TTL:         time.Hour,
@@ -50,7 +67,19 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 		if err != nil {
 			return fmt.Errorf("failed to marshal mvc: %w", err)
 		}
-		if _, err := kv.Put(ctx, mvc.Id, b); err != nil {
+		if _, err := gamesKV.Put(ctx, mvc.Id, b); err != nil {
+			return fmt.Errorf("failed to put key value: %w", err)
+		}
+		return nil
+	}
+
+	// Save MVC state to the "game1" key in the "games" bucket
+	saveUser := func(ctx context.Context, user *User) error {
+		b, err := json.Marshal(user)
+		if err != nil {
+			return fmt.Errorf("failed to marshal mvc: %w", err)
+		}
+		if _, err := userKV.Put(ctx, user.SessionID, b); err != nil {
 			return fmt.Errorf("failed to put key value: %w", err)
 		}
 		return nil
@@ -69,12 +98,53 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 		return mvc, nil
 	}
 
-	// Setup routes
+	// Handle session and save the default MVC state
+	userSession := func(w http.ResponseWriter, r *http.Request) (*User, error) {
+		ctx := r.Context()
+
+		sessionID, err := createSessionID(store, r, w)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get session id: %w", err)
+		}
+
+		user := &User{
+			SessionID: sessionID,
+		}
+		if err := saveUser(ctx, user); err != nil {
+			return nil, fmt.Errorf("failed to save mvc: %w", err)
+		}
+		return user, nil
+	}
+
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		pages.Index("HYPERMEDIA RULES").Render(r.Context(), w)
+		sessionId, err := getSessionID(store, r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		pages.Index(sessionId).Render(r.Context(), w)
 	})
 
 	router.Route("/api", func(apiRouter chi.Router) {
+
+		// Handle session and save the default state
+		apiRouter.Route("/login", func(loginRouter chi.Router) {
+			// Default game handler
+			loginRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
+				user, err := userSession(w, r)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				sse := datastar.NewSSE(w, r)
+				c := components.InitGame(user.SessionID)
+				if err := sse.MergeFragmentTempl(c); err != nil {
+					sse.ConsoleError(err)
+					return
+				}
+			})
+		})
+
 		apiRouter.Route("/game", func(gameRouter chi.Router) {
 			// Default game handler
 			gameRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -97,7 +167,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 				log.Printf("id: %s", id)
 
 				// Delete the specified key from the "games" bucket
-				if err := kv.Delete(ctx, id); err != nil {
+				if err := gamesKV.Delete(ctx, id); err != nil {
 					http.Error(w, fmt.Sprintf("failed to delete key '%s': %v", id, err), http.StatusInternalServerError)
 					return
 				}
@@ -113,7 +183,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 
 				ctx := r.Context()
 
-				watcher, err := kv.WatchAll(ctx, jetstream.UpdatesOnly())
+				watcher, err := gamesKV.WatchAll(ctx)
 				if err != nil {
 					http.Error(w, fmt.Sprintf("Failed to start watcher: %v", err), http.StatusInternalServerError)
 					return
@@ -129,10 +199,10 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 							continue
 						}
 
-						// Handle live updates
+						// Process the entry
 						switch entry.Operation() {
 						case jetstream.KeyValuePut:
-							log.Printf("Live update: Key=%s, Value=%s", entry.Key(), string(entry.Value()))
+							log.Printf("[LIVE] Key=%s, Value=%s", entry.Key(), string(entry.Value()))
 							mvc := &components.GameState{}
 							if err := json.Unmarshal(entry.Value(), mvc); err != nil {
 								http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -148,14 +218,19 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 							}
 
 						case jetstream.KeyValueDelete:
-							log.Printf("Live deletion: Key=%s", entry.Key())
+							// Compare timestamp to identify historical entries
+							if entry.Created().Before(time.Now().Add(-1 * time.Second)) {
+								log.Printf("[HISTORICAL] Skipping Key=%s", entry.Key())
+								continue
+							}
+
+							log.Printf("[LIVE DELETE] Key=%s", entry.Key())
 							id := fmt.Sprintf("#game-%s", entry.Key())
-							if err := sse.RemoveFragments(id); err != nil {
-								log.Printf("error")
+							if err := sse.RemoveFragments(id, datastar.WithRemoveSettleDuration(1*time.Millisecond), datastar.WithRemoveUseViewTransitions(true)); err != nil {
+								log.Printf("Error removing fragment for Key=%s: %v", entry.Key(), err)
 								sse.ConsoleError(err)
 								return
 							}
-							continue
 						}
 					}
 				}
@@ -176,19 +251,41 @@ func MustJSONMarshal(v any) string {
 	return string(b)
 }
 
-// Handle session IDs
-func upsertSessionID(store sessions.Store, r *http.Request, w http.ResponseWriter) (string, error) {
+// Check if a user session exists
+func getSessionID(store sessions.Store, r *http.Request) (string, error) {
 	sess, err := store.Get(r, "connections")
 	if err != nil {
 		return "", fmt.Errorf("failed to get session: %w", err)
 	}
 	id, ok := sess.Values["id"].(string)
-	if !ok {
-		id = toolbelt.NextEncodedID()
-		sess.Values["id"] = id
-		if err := sess.Save(r, w); err != nil {
-			return "", fmt.Errorf("failed to save session: %w", err)
-		}
+	if !ok || id == "" {
+		return "", nil // No session ID exists
 	}
 	return id, nil
+}
+
+// Create a new user session
+func createSessionID(store sessions.Store, r *http.Request, w http.ResponseWriter) (string, error) {
+	sess, err := store.Get(r, "connections")
+	if err != nil {
+		return "", fmt.Errorf("failed to get session: %w", err)
+	}
+	id := toolbelt.NextEncodedID()
+	sess.Values["id"] = id
+	if err := sess.Save(r, w); err != nil {
+		return "", fmt.Errorf("failed to save session: %w", err)
+	}
+	return id, nil
+}
+
+// Upsert user session: Checks if a session exists; creates one if it doesn't
+func upsertSessionID(store sessions.Store, r *http.Request, w http.ResponseWriter) (string, error) {
+	id, err := getSessionID(store, r)
+	if err != nil {
+		return "", err
+	}
+	if id != "" {
+		return id, nil // Session already exists
+	}
+	return createSessionID(store, r, w) // Create a new session
 }
