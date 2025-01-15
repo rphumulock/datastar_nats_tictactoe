@@ -19,17 +19,12 @@ tasks:
     cmds:
       - pnpx esbuild web/libs/datastar/index.ts --bundle --outdir=$STATIC_DIR
 
-  build:lit-html:
-    cmds:
-      - pnpm -r --filter=lit-html build
-
   build:
     cmds:
       - go build -o bin/main .
     deps:
       - build:styles
       - build:templ
-      - build:lit-html
       - build:esbuild
     parallel: true
 
@@ -54,10 +49,6 @@ tasks:
   live:esbuild:
     cmds:
       - pnpx esbuild web/libs/datastar/index.ts --sourcemap --bundle --outdir=$STATIC_DIR --watch
-
-  live:lit-html:
-    cmds:
-      - pnpm -r --filter=lit-html build:dev
 
   live:server:
     cmds:
@@ -86,7 +77,6 @@ tasks:
     deps:
       - live:templ
       - live:styles
-      - live:lit-html
       - live:esbuild
       - live:reload
       - live:server

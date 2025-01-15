@@ -11,7 +11,6 @@ import (
 	datastar "github.com/starfederation/datastar/code/go/sdk"
 
 	"github.com/delaneyj/toolbelt"
-	"github.com/delaneyj/toolbelt/embeddednats"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	"github.com/nats-io/nats.go/jetstream"
@@ -24,18 +23,7 @@ type User struct {
 	GameID    string `json:"game_id"`    // List of games the user is in
 }
 
-func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.Server) error {
-	// Create NATS client
-	nc, err := ns.Client()
-	if err != nil {
-		return fmt.Errorf("error creating nats client: %w", err)
-	}
-
-	// Access JetStream
-	js, err := jetstream.New(nc)
-	if err != nil {
-		return fmt.Errorf("error creating jetstream client: %w", err)
-	}
+func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetStream) error {
 
 	// Create or update the "games" KV bucket
 	gamesKV, err := js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
@@ -155,6 +143,28 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 				}
 			})
 
+			gameRouter.Post("/create", func(w http.ResponseWriter, r *http.Request) {
+				sessionId, err := getSessionID(store, r)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+
+				mvc := &components.GameState{
+					Id: sessionId,
+				}
+				b, err := json.Marshal(mvc)
+				if err != nil {
+					http.Error(w, fmt.Sprintf("failed to marshal mvc: %v", err), http.StatusInternalServerError)
+					return
+				}
+				_, err = gamesKV.Put(r.Context(), sessionId, b)
+				if err != nil {
+					http.Error(w, fmt.Sprintf("failed to put key value: %v", err), http.StatusInternalServerError)
+					return
+				}
+			})
+
 			gameRouter.Delete("/{id}/delete", func(w http.ResponseWriter, r *http.Request) {
 				ctx := r.Context()
 
@@ -179,7 +189,11 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 			gameRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
 				sse := datastar.NewSSE(w, r)
 
-				log.Printf("Live update: Key=%s, Value=%s", "s", "s")
+				sessionId, err := getSessionID(store, r)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
 
 				ctx := r.Context()
 
@@ -190,25 +204,31 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 				}
 				defer watcher.Stop()
 
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					case entry := <-watcher.Updates():
-						if entry == nil {
-							continue
-						}
+				// Track historical mode
+				historicalMode := true
 
-						// Process the entry
-						switch entry.Operation() {
-						case jetstream.KeyValuePut:
-							log.Printf("[LIVE] Key=%s, Value=%s", entry.Key(), string(entry.Value()))
+				// Process updates
+				for update := range watcher.Updates() {
+					// `nil` signals the end of the historical replay
+					if update == nil {
+						fmt.Println("End of historical updates. Now receiving live updates...")
+						historicalMode = false
+						continue
+					}
+
+					// // Process the entry
+					switch update.Operation() {
+					case jetstream.KeyValuePut:
+
+						if !historicalMode && update.Key() == sessionId {
+
 							mvc := &components.GameState{}
-							if err := json.Unmarshal(entry.Value(), mvc); err != nil {
+							if err := json.Unmarshal(update.Value(), mvc); err != nil {
 								http.Error(w, err.Error(), http.StatusInternalServerError)
 								return
 							}
-							c := components.AddGame(mvc)
+
+							c := components.AddGame(mvc, sessionId)
 							if err := sse.MergeFragmentTempl(c,
 								datastar.WithSelectorID("games-list-container"),
 								datastar.WithMergeAppend(),
@@ -216,22 +236,38 @@ func setupIndexRoute(router chi.Router, store sessions.Store, ns *embeddednats.S
 								sse.ConsoleError(err)
 								return
 							}
+						} else {
 
-						case jetstream.KeyValueDelete:
-							// Compare timestamp to identify historical entries
-							if entry.Created().Before(time.Now().Add(-1 * time.Second)) {
-								log.Printf("[HISTORICAL] Skipping Key=%s", entry.Key())
-								continue
+							mvc := &components.GameState{}
+							if err := json.Unmarshal(update.Value(), mvc); err != nil {
+								http.Error(w, err.Error(), http.StatusInternalServerError)
+								return
 							}
 
-							log.Printf("[LIVE DELETE] Key=%s", entry.Key())
-							id := fmt.Sprintf("#game-%s", entry.Key())
-							if err := sse.RemoveFragments(id, datastar.WithRemoveSettleDuration(1*time.Millisecond), datastar.WithRemoveUseViewTransitions(true)); err != nil {
-								log.Printf("Error removing fragment for Key=%s: %v", entry.Key(), err)
+							c := components.AddGame(mvc, sessionId)
+							if err := sse.MergeFragmentTempl(c,
+								datastar.WithSelectorID("games-list-container"),
+								datastar.WithMergeAppend(),
+							); err != nil {
 								sse.ConsoleError(err)
 								return
 							}
 						}
+
+					case jetstream.KeyValueDelete:
+						// Skip historical delete events
+						if historicalMode {
+							fmt.Printf("Ignoring historical delete for key: %s\n", update.Key())
+							continue
+						} else {
+							if err := sse.RemoveFragments("id",
+								datastar.WithRemoveSettleDuration(1*time.Millisecond),
+								datastar.WithRemoveUseViewTransitions(true)); err != nil {
+								sse.ConsoleError(err)
+								return
+							}
+						}
+
 					}
 				}
 

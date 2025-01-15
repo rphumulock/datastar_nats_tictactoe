@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	natsserver "github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (cleanup func() error, err error) {
@@ -42,8 +43,21 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 	sessionStore := sessions.NewCookieStore([]byte("session-secret"))
 	sessionStore.MaxAge(int(24 * time.Hour / time.Second))
 
+	// Create NATS client
+	nc, err := ns.Client()
+	if err != nil {
+		fmt.Errorf("error creating nats client: %w", err)
+	}
+
+	// Access JetStream
+	js, err := jetstream.New(nc)
+	if err != nil {
+		fmt.Errorf("error creating jetstream client: %w", err)
+	}
+
 	if err := errors.Join(
-		setupIndexRoute(router, sessionStore, ns),
+		setupIndexRoute(router, sessionStore, js),
+		setupGameRoute(router, sessionStore, js),
 	); err != nil {
 		return cleanup, fmt.Errorf("error setting up routes: %w", err)
 	}

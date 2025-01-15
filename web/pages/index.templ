@@ -1,13 +1,14 @@
 package pages
 
 import (
+	datastar "github.com/starfederation/datastar/code/go/sdk"
 	"github.com/zangster300/northstar/web/components"
 	"github.com/zangster300/northstar/web/layouts"
 )
 
 templ Index(sessionId string) {
 	@layouts.Base() {
-		<div class="flex flex-col w-full min-h-screen bg-base-200">
+		<div class="flex flex-col w-full min-h-screen">
 			<nav class="w-full bg-primary text-white py-4 px-6 shadow">
 				<div class="container mx-auto flex items-center justify-between">
 					<span class="text-xl font-semibold">Tic Tac Toe</span>
@@ -15,17 +16,31 @@ templ Index(sessionId string) {
 				</div>
 			</nav>
 			<!-- Main Content -->
-			<div class="flex flex-grow items-center justify-center">
-				<div id="main-container">
-					if sessionId != "" {
-						@components.InitGame(sessionId)
-					} else {
-						<!-- No session -->
-						<button class="btn btn-primary px-8 text-lg text-center" data-on-click="$get('/api/login')">
-							Login
-						</button>
-					}
+			if sessionId != "" {
+				@components.InitGame(sessionId)
+			} else {
+				<div id="main-container" class="flex flex-col items-center justify-center">
+					<button class="btn btn-primary px-8 text-lg text-center" data-on-click="$get('/api/login')">
+						Login
+					</button>
 				</div>
+			}
+		</div>
+	}
+}
+
+templ Game(id string) {
+	@layouts.Base() {
+		<div class="flex flex-col w-full min-h-screen">
+			<nav class="w-full bg-primary text-white py-4 px-6 shadow">
+				<div class="container mx-auto flex items-center justify-between">
+					<span class="text-xl font-semibold">Tic Tac Toe</span>
+					<div id="user-session-container"></div>
+				</div>
+			</nav>
+			<div id="main-container" class="flex flex-col items-center justify-center">
+				{ id }
+				<button class="btn btn-primary" data-on-click={ datastar.DeleteSSE("/api/game/%s/delete", id) }>Delete</button>
 			</div>
 		</div>
 	}
