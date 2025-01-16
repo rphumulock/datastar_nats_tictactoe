@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -21,89 +22,99 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 		return fmt.Errorf("failed to get games key value: %w", err)
 	}
 
-	router.Get("/game/{id}", func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
+	router.Route("/game", func(gameRouter chi.Router) {
 
-		// Retrieve the session ID
-		sessionId, err := getSessionID(store, r)
-		if err != nil || sessionId == "" {
-			respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
-			return
-		}
+		// Handle session and save the default state
+		gameRouter.Route("/api", func(gameApiRouter chi.Router) {
 
-		// Retrieve the game ID from the URL
-		id := chi.URLParam(r, "id")
-		if id == "" {
-			respondError(w, http.StatusBadRequest, "missing 'id' parameter")
-			return
-		}
+			gameApiRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
 
-		// Fetch the game state from the key-value store
-		entry, err := gamesKV.Get(ctx, id)
-		if err != nil {
-			if err == nats.ErrKeyNotFound {
-				respondError(w, http.StatusNotFound, "game with id '%s' not found", id)
-				return
-			}
-			respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
-			return
-		}
+				ctx := r.Context()
 
-		// Unmarshal the game state
-		mvc := &components.GameState{}
-		if err := json.Unmarshal(entry.Value(), mvc); err != nil {
-			respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
-			return
-		}
+				// Retrieve the game ID from the URL
+				id := chi.URLParam(r, "id")
+				if id == "" {
+					respondError(w, http.StatusBadRequest, "missing 'id' parameter")
+					return
+				}
 
-		// Ensure the game is not full and the session ID is valid
-		if gameIsFull(mvc) && !containsPlayer(mvc.Players[:], sessionId) {
-			respondError(w, http.StatusForbidden, "game is full")
-			return
-		}
+				// Watch updates for the specific key
+				watcher, err := gamesKV.Watch(ctx, id)
+				if err != nil {
+					log.Fatalf("Error starting watcher: %v", err)
+				}
+				defer watcher.Stop()
 
-		// Add the player if they are not already in the game
-		if !containsPlayer(mvc.Players[:], sessionId) {
-			addPlayer(mvc, sessionId)
-			if err := updateGameState(ctx, gamesKV, mvc); err != nil {
-				respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
-				return
-			}
-		}
+				// Process updates
+				for update := range watcher.Updates() {
+					if update == nil {
+						// End of updates (e.g., the watcher was stopped)
+						fmt.Println("Watcher stopped or no more updates.")
+						return
+					}
 
-		// Render the game page
-		components.GameMVCView(mvc, sessionId).Render(ctx, w)
+					// Process the update (you can add your processing logic here)
+					fmt.Printf("Received update: %+v\n", update)
+				}
+			})
+
+			// Default game handler
+			gameApiRouter.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
+
+				ctx := r.Context()
+
+				// Retrieve the session ID
+				sessionId, err := getSessionID(store, r)
+				if err != nil || sessionId == "" {
+					respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
+					return
+				}
+
+				// Retrieve the game ID from the URL
+				id := chi.URLParam(r, "id")
+				if id == "" {
+					respondError(w, http.StatusBadRequest, "missing 'id' parameter")
+					return
+				}
+
+				// Fetch the game state from the key-value store
+				entry, err := gamesKV.Get(ctx, id)
+				if err != nil {
+					if err == nats.ErrKeyNotFound {
+						respondError(w, http.StatusNotFound, "game with id '%s' not found", id)
+						return
+					}
+					respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
+					return
+				}
+
+				// Unmarshal the game state
+				mvc := &components.GameState{}
+				if err := json.Unmarshal(entry.Value(), mvc); err != nil {
+					respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
+					return
+				}
+
+				// Ensure the game is not full and the session ID is valid
+				if gameIsFull(mvc) && !containsPlayer(mvc.Players[:], sessionId) {
+					respondError(w, http.StatusForbidden, "game is full")
+					return
+				}
+
+				// Add the player if they are not already in the game
+				if !containsPlayer(mvc.Players[:], sessionId) {
+					addPlayer(mvc, sessionId)
+					if err := updateGameState(ctx, gamesKV, mvc); err != nil {
+						respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
+						return
+					}
+				}
+
+				// Render the game page
+				components.GameMVCView(mvc, sessionId).Render(ctx, w)
+			})
+		})
 	})
-
-	// router.Get("/test/game/{id}", func(w http.ResponseWriter, r *http.Request) {
-	// 	ctx := r.Context()
-
-	// 	// Retrieve the game ID from the URL
-	// 	id := chi.URLParam(r, "id")
-	// 	if id == "" {
-	// 		respondError(w, http.StatusBadRequest, "missing 'id' parameter")
-	// 		return
-	// 	}
-
-	// 	// Watch updates for the specific key
-	// 	watcher, err := gamesKV.Watch(ctx, id)
-	// 	if err != nil {
-	// 		log.Fatalf("Error starting watcher: %v", err)
-	// 	}
-	// 	defer watcher.Stop()
-
-	// 	// Process updates
-	// 	for update := range watcher.Updates() {
-	// 		if update == nil {
-	// 			// End of updates (e.g., the watcher was stopped)
-	// 			fmt.Println("Watcher stopped or no more updates.")
-	// 			return
-	// 		}
-
-	// 		// Process the update (you can add your processing logic here)
-	// 		fmt.Printf("Received update: %+v\n", update)
-	// 	}
-	// })
 
 	return nil
 }

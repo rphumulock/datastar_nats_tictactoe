@@ -50,11 +50,11 @@ templ GameMVCView(mvc *GameState, sessionId string) {
 					<span class="text-xl font-semibold">Tic Tac Toe - Game: { mvc.Id }</span>
 					<div id="user-session-container">Hello { sessionId }!</div>
 					<div data-text="$clicks"></div>
-					<div
-						id="games-list-container"
-						class="space-y-6"
-						data-on-load={ fmt.Sprintf("$get('/test/game/%s')", mvc.Id) }
-					></div>
+					// <div
+					// 	id="games-list-container"
+					// 	class="space-y-6"
+					// 	data-on-load={ fmt.Sprintf("$get('/test/game/%s')", mvc.Id) }
+					// ></div>
 				</div>
 				<section class="flex flex-col w-full h-full gap-2">
 					<div class="grid grid-cols-3 grid-rows-3 gap-2 w-full h-full mt-4">
