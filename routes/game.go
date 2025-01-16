@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -9,44 +10,120 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/zangster300/northstar/web/pages"
+	"github.com/zangster300/northstar/web/components"
 )
 
 func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStream) error {
 
-	// Create or get the KeyValue bucket for "games"
-	gamesKV, err := js.KeyValue(context.Background(), "games")
-	if err != nil {
-		return fmt.Errorf("error creating key-value bucket: %w", err)
-	}
-
 	router.Get("/game/{id}", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 
-		// Get the "id" parameter from the URL
+		// Get or create the KeyValue bucket for "games"
+		gamesKV, err := js.KeyValue(ctx, "games")
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "error accessing key-value store: %v", err)
+			return
+		}
+
+		// Retrieve the session ID
+		sessionId, err := getSessionID(store, r)
+		if err != nil || sessionId == "" {
+			respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
+			return
+		}
+
+		// Retrieve the game ID from the URL
 		id := chi.URLParam(r, "id")
 		if id == "" {
-			http.Error(w, "missing 'id' parameter", http.StatusBadRequest)
+			respondError(w, http.StatusBadRequest, "missing 'id' parameter")
 			return
 		}
 
-		// Check if the key exists in the "games" bucket
-		entry, err := gamesKV.Get(r.Context(), id)
+		// Fetch the game state from the key-value store
+		entry, err := gamesKV.Get(ctx, id)
 		if err != nil {
 			if err == nats.ErrKeyNotFound {
-				http.Error(w, fmt.Sprintf("game with id '%s' not found", id), http.StatusNotFound)
+				respondError(w, http.StatusNotFound, "game with id '%s' not found", id)
 				return
 			}
-			http.Error(w, fmt.Sprintf("error retrieving game: %v", err), http.StatusInternalServerError)
+			respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
 			return
 		}
 
-		// Use the retrieved value (entry.Value()) if necessary
-		// Example: Assume `pages.Game` is rendering based on the ID
-		fmt.Printf("Game ID: %s, Value: %s\n", entry.Key(), string(entry.Value()))
+		// Unmarshal the game state
+		mvc := &components.GameState{}
+		if err := json.Unmarshal(entry.Value(), mvc); err != nil {
+			respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
+			return
+		}
+
+		// Ensure the game is not full and the session ID is valid
+		if gameIsFull(mvc) && !containsPlayer(mvc.Players[:], sessionId) {
+			respondError(w, http.StatusForbidden, "game is full")
+			return
+		}
+
+		// Add the player if they are not already in the game
+		if !containsPlayer(mvc.Players[:], sessionId) {
+			addPlayer(mvc, sessionId)
+			if err := updateGameState(ctx, gamesKV, mvc); err != nil {
+				respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
+				return
+			}
+		}
+
+		// Debugging information
+		fmt.Printf("Game ID: %s, Game State: %+v\n", mvc.Id, mvc)
 
 		// Render the game page
-		pages.Game(id).Render(r.Context(), w)
+		components.GameMVCView(mvc, sessionId).Render(ctx, w)
+	})
+
+	router.Route("/api", func(apiRouter chi.Router) {
+
 	})
 
 	return nil
+}
+
+// Helper function to respond with an error
+func respondError(w http.ResponseWriter, statusCode int, format string, args ...interface{}) {
+	message := fmt.Sprintf(format, args...)
+	http.Error(w, message, statusCode)
+}
+
+// Helper function to check if the game is full
+func gameIsFull(mvc *components.GameState) bool {
+	return mvc.Players[0] != "" && mvc.Players[1] != ""
+}
+
+// Helper function to add a player to the game
+func addPlayer(mvc *components.GameState, sessionId string) {
+	if mvc.Players[0] == "" {
+		mvc.Players[0] = sessionId
+	} else if mvc.Players[1] == "" {
+		mvc.Players[1] = sessionId
+	}
+}
+
+// Helper function to update the game state in the KV store
+func updateGameState(ctx context.Context, gamesKV jetstream.KeyValue, mvc *components.GameState) error {
+	data, err := json.Marshal(mvc)
+	if err != nil {
+		return fmt.Errorf("error marshalling game state: %v", err)
+	}
+	if _, err := gamesKV.Put(ctx, mvc.Id, data); err != nil {
+		return fmt.Errorf("error storing game state: %v", err)
+	}
+	return nil
+}
+
+// Helper function to check if a player is already in the game
+func containsPlayer(players []string, player string) bool {
+	for _, p := range players {
+		if p == player {
+			return true
+		}
+	}
+	return false
 }

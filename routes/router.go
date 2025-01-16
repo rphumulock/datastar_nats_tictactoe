@@ -46,13 +46,15 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 	// Create NATS client
 	nc, err := ns.Client()
 	if err != nil {
-		fmt.Errorf("error creating nats client: %w", err)
+		err = fmt.Errorf("error creating nats client: %w", err)
+		return nil, err
 	}
 
 	// Access JetStream
 	js, err := jetstream.New(nc)
 	if err != nil {
-		fmt.Errorf("error creating jetstream client: %w", err)
+		err = fmt.Errorf("error creating nats client: %w", err)
+		return nil, err
 	}
 
 	if err := errors.Join(

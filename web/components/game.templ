@@ -3,45 +3,198 @@ package components
 import (
 	"fmt"
 	datastar "github.com/starfederation/datastar/code/go/sdk"
+	"github.com/zangster300/northstar/web/layouts"
 )
 
-// "fmt"
-
-// type TodoViewMode int
-
-// const (
-// 	TodoViewModeAll TodoViewMode = iota
-// 	TodoViewModeActive
-// 	TodoViewModeCompleted
-// 	TodoViewModeLast
-// )
-
-// var TodoViewModeStrings = []string{"All", "Active", "Completed"}
-
-// type Todo struct {
-// 	Text      string `json:"text"`
-// 	Completed bool   `json:"completed"`
-// }
-
-// type TodoMVC struct {
-// 	Todos      []*Todo      `json:"todos"`
-// 	EditingIdx int          `json:"editingIdx"`
-// 	Mode       TodoViewMode `json:"mode"`
-// }
-
-// ------------------------------------------
 type GameState struct {
 	Id      string    `json:"id"`
-	Players [2]string // Players' Ids
-	Board   [9]string // 9-cell board initialized with empty strings
-	XIsNext bool      // Indicates if X is the next player
-	Winner  string    // The winner of the game ("X" or "O")
+	Players [2]string `json:"players"`
+	Board   [9]string `json:"board"`
+	XIsNext bool      `json:"x_is_next"`
+	Winner  string    `json:"winner"`
 }
 
-type Player struct {
-	Id     string `json:"id"`
-	GameId string `json:"gameId"`
+// ------------------------------------------
+templ InitGame(sessionId string) {
+	<div id="main-container" class="flex flex-col items-center justify-center">
+		<div class="text-center text-3xl font-bold mb-6">
+			Welcome, { sessionId }
+		</div>
+		<button
+			class="btn btn-primary text-lg"
+			data-on-click={ datastar.PostSSE("/api/game/create") }
+		>
+			Create Game
+		</button>
+		<section class="w-1/2 m-8 p-6 bg-base-300 border-4 border-accent-content shadow-lg rounded-lg h-[32rem] overflow-y-scroll">
+			<h2 class="text-2xl text-secondary-content text-bg-base mb-6">Active Games</h2>
+			<div
+				id="games-list-container"
+				class="space-y-6"
+				data-on-load="$get('/api/games')"
+			></div>
+		</section>
+	</div>
 }
+
+templ GameMVCView(mvc *GameState, sessionId string) {
+	@layouts.Base() {
+		<div id="game-container" class="h-full w-3/4 relative border border-solid border-primary rounded p-2 my-2 mx-28">
+			<div class="flex flex-col w-full h-full gap-4">
+				<div class="container mx-auto flex items-center justify-between">
+					<span class="text-xl font-semibold">Tic Tac Toe - Game: { mvc.Id }</span>
+					<div id="user-session-container">Hello { sessionId }!</div>
+				</div>
+				<section class="flex flex-col w-full h-full gap-2">
+					<div class="grid grid-cols-3 grid-rows-3 gap-2 w-full h-full mt-4">
+						for i, cell := range mvc.Board {
+							@Cell(cell, i)
+						}
+					</div>
+				</section>
+				<footer class="flex justify-center text-xs">
+					<button
+						class="btn btn-primary text-lg"
+						data-on-click={ datastar.PostSSE("/api/game/reset") }
+					>
+						Reset
+					</button>
+				</footer>
+			</div>
+		</div>
+	}
+}
+
+templ RemoveGame(mvc *GameState) {
+	{{ id := fmt.Sprintf("game-%s", mvc.Id) }}
+	<div id={ id }>
+		{ mvc.Id }
+	</div>
+}
+
+templ JoinGame(mvc *GameState, sessionId string) {
+	{{
+		gameFull := mvc.Players[1] != "" && mvc.Players[0] != sessionId && mvc.Players[1] != sessionId
+		id := fmt.Sprintf("game-%s", mvc.Id)
+	}}
+	<div id={ id } class="p-4 bg-gray-100 rounded-lg shadow">
+		<h3 class="text-lg font-semibold text-gray-700">{ mvc.Id }</h3>
+		if gameFull {
+			<p class="text-red-500">Game is full</p>
+		} else {
+			<a class="btn btn-primary mt-4 w-full" href={ templ.URL(fmt.Sprintf("/game/%s", mvc.Id)) }>Join Game</a>
+		}
+	</div>
+}
+
+templ HostedGame(mvc *GameState, sessionId string) {
+	{{ id := fmt.Sprintf("game-%s", mvc.Id) }}
+	<div id={ id } class="p-4 bg-gray-100 rounded-lg shadow">
+		<h3 class="text-lg font-semibold text-gray-700">{ mvc.Id }</h3>
+		<a class="btn btn-primary mt-4 w-full" href={ templ.URL(fmt.Sprintf("/game/%s", sessionId)) }>Join Game</a>
+		<button class="btn btn-error mt-4 w-full" data-on-click={ datastar.DeleteSSE("/api/game/%s/delete", mvc.Id) }>Delete</button>
+	</div>
+}
+
+templ Cell(cell string, i int) {
+	{{
+		clicked := cell != ""
+	}}
+	<button
+		class={
+			"w-full h-full border-primary flex items-center justify-center text-5xl font-semibold cursor-pointer",
+			map[string]bool{
+				"hover:border-gray-100 border-2 ": !clicked,
+				"border-secondary border-8":       clicked,
+			},
+		}
+		data-on-click={ datastar.PostSSE("/api/game/%d/toggle", i) }
+		if cell != "" {
+			disabled
+		}
+	>
+		{ cell }
+	</button>
+}
+
+// templ Game(id string) {
+// 	@layouts.Base() {
+// 		<div class="flex flex-col w-full min-h-screen">
+// 			<nav class="w-full bg-primary text-white py-4 px-6 shadow">
+// 				<div class="container mx-auto flex items-center justify-between">
+// 					<span class="text-xl font-semibold">Tic Tac Toe</span>
+// 					<div id="user-session-container"></div>
+// 				</div>
+// 			</nav>
+// 			<div id="main-container" class="flex flex-col items-center justify-center">
+// 				{ id }
+// 				<button class="btn btn-primary" data-on-click={ datastar.DeleteSSE("/api/game/%s/delete", id) }>Delete</button>
+// 			</div>
+// 		</div>
+// 	}
+// }
+
+// templ TodoInput(i int) {
+// 	<input
+// 		id="todoInput"
+// 		class="flex-1 w-full input input-bordered input-lg"
+// 		placeholder="What needs to be done?"
+// 		data-model="input"
+// 		data-on-keypress={ fmt.Sprintf(`
+// 			if (event.key === 'Enter' && $input.trim().length) {
+// 				$put('/api/todos/%d/edit');
+// 				$input = '';
+// 			}
+// 		`, i) }
+// 		if i >= 0 {
+// 			data-on-click.outside.capture="$put('/api/todos/cancel')"
+// 		}
+// 	/>
+// }
+
+// {{
+// 	indicatorID := fmt.Sprintf("indicator%d", i)
+// 	fetchingSignalName := fmt.Sprintf("fetching%d", i)
+// }}
+// if isEditing {
+// 	@TodoInput(i)
+// } else if (
+// 	mode == TodoViewModeAll) ||
+// 	(mode == TodoViewModeActive && !todo.Completed) ||
+// 	(mode == TodoViewModeCompleted && todo.Completed) {
+// <li class="flex items-center gap-8 p-2 group" id={ fmt.Sprintf("todo%d", i) }>
+// 		<label
+// 			id={ fmt.Sprintf("toggle%d", i) }
+// 			class="text-4xl cursor-pointer"
+// 			data-on-click={ datastar.PostSSE("/api/todos/%d/toggle", i) }
+// 			data-indicator={ fetchingSignalName }
+// 		>
+// 			if todo.Completed {
+// 				@icon("material-symbols:check-box-outline")
+// 			} else {
+// 				@icon("material-symbols:check-box-outline-blank")
+// 			}
+// 		</label>
+// 		<label
+// 			id={ indicatorID }
+// 			class="flex-1 text-lg cursor-pointer select-none"
+// 			data-on-click={ datastar.GetSSE("/api/todos/%d/edit", i) }
+// 			data-indicator={ fetchingSignalName }
+// 		>
+// 			{ todo.Text }
+// 		</label>
+// 		@sseIndicator(fetchingSignalName)
+// 		<button
+// 			id={ fmt.Sprintf("delete%d", i) }
+// 			class="invisible btn btn-error group-hover:visible"
+// 			data-on-click={ datastar.DeleteSSE("/api/todos/%d", i) }
+// 			data-indicator={ fetchingSignalName }
+// 			data-disabled={ "$" + fetchingSignalName }
+// 		>
+// 			@icon("material-symbols:close")
+// 		</button>
+// 	</li>
+// }
 
 // templ TodosMVCView(mvc *GameState) {
 // 	<div id="todos-container" class="h-full relative border border-solid border-primary rounded p-2 my-2 mx-28">
@@ -135,154 +288,4 @@ type Player struct {
 // 			</section>
 // 		</div>
 // 	</div>
-// }
-templ InitGame(sessionId string) {
-	<div id="main-container" class="flex flex-col items-center justify-center">
-		<div class="text-center text-3xl font-bold mb-6">
-			Welcome, { sessionId }
-		</div>
-		<button
-			class="btn btn-primary text-lg"
-			data-on-click={ datastar.PostSSE("/api/game/create") }
-		>
-			Create Game
-		</button>
-		// <button
-		// 	class="btn btn-primary text-lg transition-all duration-200 shadow-lg hover:bg-primary-focus"
-		// 	data-on-click="$get('/api/game')"
-		// >
-		// 	Create Game
-		// </button>
-		<section class="w-1/2 m-8 p-6 bg-base-300 border-4 border-accent-content shadow-lg rounded-lg h-[32rem] overflow-y-scroll">
-			<h2 class="text-2xl text-secondary-content text-bg-base mb-6">Active Games</h2>
-			<div
-				id="games-list-container"
-				class="space-y-6"
-				data-on-load="$get('/api/games')"
-			></div>
-		</section>
-	</div>
-}
-
-templ GameMVCView(mvc *GameState) {
-	<div id="game-container" class="h-full w-3/4 relative border border-solid border-primary rounded p-2 my-2 mx-28">
-		<div class="flex flex-col w-full h-full gap-4">
-			<section class="flex flex-col w-full h-full gap-2">
-				<div class="grid grid-cols-3 grid-rows-3 gap-2 w-full h-full mt-4">
-					for i, cell := range mvc.Board {
-						@Cell(cell, i)
-					}
-				</div>
-			</section>
-			<footer class="flex justify-center text-xs">
-				<button
-					class="btn btn-primary text-lg"
-					data-on-click={ datastar.PostSSE("/api/game/reset") }
-				>
-					Reset
-				</button>
-			</footer>
-		</div>
-	</div>
-}
-
-templ RemoveGame(mvc *GameState) {
-	{{ id := fmt.Sprintf("game-%s", mvc.Id) }}
-	<div id={ id }>
-		{ mvc.Id }
-	</div>
-}
-
-templ AddGame(mvc *GameState, sessionId string) {
-	{{ id := fmt.Sprintf("game-%s", mvc.Id) }}
-	<div id={ id } class="p-4 bg-gray-100 rounded-lg shadow">
-		<h3 class="text-lg font-semibold text-gray-700">{ mvc.Id }</h3>
-		<p class="text-gray-600">Hosted by: { mvc.Id }</p>
-		<button class="btn btn-primary mt-4 w-full">Join Game</button>
-		if (mvc.Id == sessionId) {
-			<button class="btn btn-error mt-4 w-full" data-on-click={ datastar.DeleteSSE("/api/game/%s/delete", mvc.Id) }>Delete</button>
-		}
-	</div>
-}
-
-// templ TodoInput(i int) {
-// 	<input
-// 		id="todoInput"
-// 		class="flex-1 w-full input input-bordered input-lg"
-// 		placeholder="What needs to be done?"
-// 		data-model="input"
-// 		data-on-keypress={ fmt.Sprintf(`
-// 			if (event.key === 'Enter' && $input.trim().length) {
-// 				$put('/api/todos/%d/edit');
-// 				$input = '';
-// 			}
-// 		`, i) }
-// 		if i >= 0 {
-// 			data-on-click.outside.capture="$put('/api/todos/cancel')"
-// 		}
-// 	/>
-// }
-templ Cell(cell string, i int) {
-	{{
-		clicked := cell != ""
-	}}
-	<button
-		class={
-			"w-full h-full border-primary flex items-center justify-center text-5xl font-semibold cursor-pointer",
-			map[string]bool{
-				"hover:border-gray-100 border-2 ": !clicked,
-				"border-secondary border-8":       clicked,
-			},
-		}
-		data-on-click={ datastar.PostSSE("/api/game/%d/toggle", i) }
-		if cell != "" {
-			disabled
-		}
-	>
-		{ cell }
-	</button>
-}
-
-// {{
-// 	indicatorID := fmt.Sprintf("indicator%d", i)
-// 	fetchingSignalName := fmt.Sprintf("fetching%d", i)
-// }}
-// if isEditing {
-// 	@TodoInput(i)
-// } else if (
-// 	mode == TodoViewModeAll) ||
-// 	(mode == TodoViewModeActive && !todo.Completed) ||
-// 	(mode == TodoViewModeCompleted && todo.Completed) {
-// <li class="flex items-center gap-8 p-2 group" id={ fmt.Sprintf("todo%d", i) }>
-// 		<label
-// 			id={ fmt.Sprintf("toggle%d", i) }
-// 			class="text-4xl cursor-pointer"
-// 			data-on-click={ datastar.PostSSE("/api/todos/%d/toggle", i) }
-// 			data-indicator={ fetchingSignalName }
-// 		>
-// 			if todo.Completed {
-// 				@icon("material-symbols:check-box-outline")
-// 			} else {
-// 				@icon("material-symbols:check-box-outline-blank")
-// 			}
-// 		</label>
-// 		<label
-// 			id={ indicatorID }
-// 			class="flex-1 text-lg cursor-pointer select-none"
-// 			data-on-click={ datastar.GetSSE("/api/todos/%d/edit", i) }
-// 			data-indicator={ fetchingSignalName }
-// 		>
-// 			{ todo.Text }
-// 		</label>
-// 		@sseIndicator(fetchingSignalName)
-// 		<button
-// 			id={ fmt.Sprintf("delete%d", i) }
-// 			class="invisible btn btn-error group-hover:visible"
-// 			data-on-click={ datastar.DeleteSSE("/api/todos/%d", i) }
-// 			data-indicator={ fetchingSignalName }
-// 			data-disabled={ "$" + fetchingSignalName }
-// 		>
-// 			@icon("material-symbols:close")
-// 		</button>
-// 	</li>
 // }
