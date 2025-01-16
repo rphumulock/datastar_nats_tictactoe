@@ -101,8 +101,10 @@ func GameMVCView(mvc *GameState, sessionId string) templ.Component {
 		}
 		ctx = templ.ClearChildren(ctx)
 
-		store := mvc.Board
-		log.Println("Board", store)
+		gameId := mvc.Id
+		board := mvc.Board
+
+		log.Println("Board", board)
 		templ_7745c5c3_Var5 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -120,9 +122,9 @@ func GameMVCView(mvc *GameState, sessionId string) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var6 string
-			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(mvc.Id)
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(gameId)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 50, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 52, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -135,7 +137,7 @@ func GameMVCView(mvc *GameState, sessionId string) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(sessionId)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 51, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 53, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -145,8 +147,8 @@ func GameMVCView(mvc *GameState, sessionId string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			for i, cell := range mvc.Board {
-				templ_7745c5c3_Err = Cell(cell, i).Render(ctx, templ_7745c5c3_Buffer)
+			for i, cell := range board {
+				templ_7745c5c3_Err = Cell(gameId, cell, i).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -158,7 +160,7 @@ func GameMVCView(mvc *GameState, sessionId string) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.PostSSE("api/game/reset"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 69, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 65, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -207,7 +209,7 @@ func RemoveGame(mvc *GameState) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 81, Col: 13}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 77, Col: 13}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -220,7 +222,7 @@ func RemoveGame(mvc *GameState) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(mvc.Id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 82, Col: 10}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 78, Col: 10}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -265,7 +267,7 @@ func JoinGame(mvc *GameState, sessionId string) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 91, Col: 13}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 87, Col: 13}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -278,7 +280,7 @@ func JoinGame(mvc *GameState, sessionId string) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(mvc.Id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 92, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 88, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -345,7 +347,7 @@ func HostedGame(mvc *GameState, sessionId string) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 103, Col: 13}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 99, Col: 13}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -358,7 +360,7 @@ func HostedGame(mvc *GameState, sessionId string) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(mvc.Id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 104, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 100, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -380,7 +382,7 @@ func HostedGame(mvc *GameState, sessionId string) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.DeleteSSE("/api/game/%s/delete", mvc.Id))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 106, Col: 109}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 102, Col: 109}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
@@ -394,7 +396,7 @@ func HostedGame(mvc *GameState, sessionId string) templ.Component {
 	})
 }
 
-func Cell(cell string, i int) templ.Component {
+func Cell(id string, cell string, i int) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -446,9 +448,9 @@ func Cell(cell string, i int) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var24 string
-		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.PostSSE("/test/game//api/game/%d/toggle", i))
+		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.PostSSE("/game/%s/toggle/%d", id, i))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 122, Col: 71}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 118, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
@@ -471,7 +473,7 @@ func Cell(cell string, i int) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(cell)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 127, Col: 8}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/game.templ`, Line: 123, Col: 8}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
@@ -485,176 +487,4 @@ func Cell(cell string, i int) templ.Component {
 	})
 }
 
-// templ Game(id string) {
-// 	@layouts.Base() {
-// 		<div class="flex flex-col w-full min-h-screen">
-// 			<nav class="w-full bg-primary text-white py-4 px-6 shadow">
-// 				<div class="container mx-auto flex items-center justify-between">
-// 					<span class="text-xl font-semibold">Tic Tac Toe</span>
-// 					<div id="user-session-container"></div>
-// 				</div>
-// 			</nav>
-// 			<div id="main-container" class="flex flex-col items-center justify-center">
-// 				{ id }
-// 				<button class="btn btn-primary" data-on-click={ datastar.DeleteSSE("/api/game/%s/delete", id) }>Delete</button>
-// 			</div>
-// 		</div>
-// 	}
-// }
-
-// templ TodoInput(i int) {
-// 	<input
-// 		id="todoInput"
-// 		class="flex-1 w-full input input-bordered input-lg"
-// 		placeholder="What needs to be done?"
-// 		data-model="input"
-// 		data-on-keypress={ fmt.Sprintf(`
-// 			if (event.key === 'Enter' && $input.trim().length) {
-// 				$put('/api/todos/%d/edit');
-// 				$input = '';
-// 			}
-// 		`, i) }
-// 		if i >= 0 {
-// 			data-on-click.outside.capture="$put('/api/todos/cancel')"
-// 		}
-// 	/>
-// }
-
-// {{
-// 	indicatorID := fmt.Sprintf("indicator%d", i)
-// 	fetchingSignalName := fmt.Sprintf("fetching%d", i)
-// }}
-// if isEditing {
-// 	@TodoInput(i)
-// } else if (
-// 	mode == TodoViewModeAll) ||
-// 	(mode == TodoViewModeActive && !todo.Completed) ||
-// 	(mode == TodoViewModeCompleted && todo.Completed) {
-// <li class="flex items-center gap-8 p-2 group" id={ fmt.Sprintf("todo%d", i) }>
-// 		<label
-// 			id={ fmt.Sprintf("toggle%d", i) }
-// 			class="text-4xl cursor-pointer"
-// 			data-on-click={ datastar.PostSSE("/api/todos/%d/toggle", i) }
-// 			data-indicator={ fetchingSignalName }
-// 		>
-// 			if todo.Completed {
-// 				@icon("material-symbols:check-box-outline")
-// 			} else {
-// 				@icon("material-symbols:check-box-outline-blank")
-// 			}
-// 		</label>
-// 		<label
-// 			id={ indicatorID }
-// 			class="flex-1 text-lg cursor-pointer select-none"
-// 			data-on-click={ datastar.GetSSE("/api/todos/%d/edit", i) }
-// 			data-indicator={ fetchingSignalName }
-// 		>
-// 			{ todo.Text }
-// 		</label>
-// 		@sseIndicator(fetchingSignalName)
-// 		<button
-// 			id={ fmt.Sprintf("delete%d", i) }
-// 			class="invisible btn btn-error group-hover:visible"
-// 			data-on-click={ datastar.DeleteSSE("/api/todos/%d", i) }
-// 			data-indicator={ fetchingSignalName }
-// 			data-disabled={ "$" + fetchingSignalName }
-// 		>
-// 			@icon("material-symbols:close")
-// 		</button>
-// 	</li>
-// }
-
-//	templ TodosMVCView(mvc *GameState) {
-//		<div id="todos-container" class="h-full relative border border-solid border-primary rounded p-2 my-2 mx-28">
-//			<div
-//				class="flex flex-col w-full gap-4"
-//				data-store={ fmt.Sprintf("{input:'%s'}", input) }
-//			>
-//				<section class="flex flex-col gap-2">
-//					<header class="flex flex-col gap-2">
-//						<div class="flex items-baseline gap-2 justify-center">
-//							<h1 class="text-4xl font-bold uppercase font-brand md:text-6xl text-primary">todos</h1>
-//						</div>
-//						<div class="flex items-center gap-2">
-//							if hasTodos {
-//								<div class="tooltip" data-tip="toggle all todos">
-//									<button
-//										id="toggleAll"
-//										class="btn btn-lg"
-//										data-on-click="$post('/api/todos/-1/toggle')"
-//										data-indicator="toggleAllFetching"
-//										data-bind-disabled="$toggleAllFetching"
-//									>
-//										@icon("material-symbols:checklist")
-//									</button>
-//								</div>
-//							}
-//							if mvc.EditingIdx <0 {
-//								@TodoInput(-1)
-//							}
-//							@sseIndicator("toggleAllFetching")
-//						</div>
-//					</header>
-//					if hasTodos {
-//						// <section class="max-h-[calc(100vh-400px)] overflow-scroll">
-//						// 	<ul class="divide-y divide-primary">
-//						// 		for i, todo := range mvc.Todos {
-//						// 			@TodoRow(mvc.Mode, todo, i, i == mvc.EditingIdx)
-//						// 		}
-//						// 	</ul>
-//						// </section>
-//						// <footer class="flex flex-wrap items-center justify-between gap-2">
-//						// 	<span class="todo-count">
-//						// 		<strong>
-//						// 			{ fmt.Sprint(left) }
-//						// 			if (len(mvc.Todos) > 1) {
-//						// 				items
-//						// 			} else {
-//						// 				item
-//						// 			}
-//						// 		</strong> left
-//						// 	</span>
-//						// 	<div class="join">
-//						// 		for i := TodoViewModeAll; i < TodoViewModeLast; i++ {
-//						// 			if i == mvc.Mode {
-//						// 				<div class="btn btn-xs btn-primary join-item">{ TodoViewModeStrings[i] }</div>
-//						// 			} else {
-//						// 				<button
-//						// 					class="btn btn-xs join-item"
-//						// 					data-on-click={ fmt.Sprintf("$put('/api/todos/mode/%d')", i) }
-//						// 				>
-//						// 					{ TodoViewModeStrings[i] }
-//						// 				</button>
-//						// 			}
-//						// 		}
-//						// 	</div>
-//						// 	<div class="join">
-//						// 		if completed > 0 {
-//						// 			<div class="tooltip" data-tip={ fmt.Sprintf("clear %d completed todos", completed) }>
-//						// 				<button
-//						// 					class="btn btn-error btn-xs join-item"
-//						// 					data-on-click="$delete('/api/todos/-1')"
-//						// 				>
-//						// 					@icon("material-symbols:delete")
-//						// 				</button>
-//						// 			</div>
-//						// 		}
-//						// 		<div class="tooltip" data-tip="Reset list">
-//						// 			<button
-//						// 				class="btn btn-warning btn-xs join-item"
-//						// 				data-on-click="$put('/api/todos/reset')"
-//						// 			>
-//						// 				@icon("material-symbols:delete-sweep")
-//						// 			</button>
-//						// 		</div>
-//						// 	</div>
-//						// </footer>
-//						// 	<footer class="flex justify-center text-xs">
-//						// 		<div>Click to edit, click away to cancel, press enter to save.</div>
-//						// 	</footer>
-//					}
-//				</section>
-//			</div>
-//		</div>
-//	}
 var _ = templruntime.GeneratedTemplate
