@@ -14,16 +14,15 @@ import (
 )
 
 func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStream) error {
+	ctx := context.Background()
+
+	gamesKV, err := js.KeyValue(ctx, "games")
+	if err != nil {
+		return fmt.Errorf("failed to get games key value: %w", err)
+	}
 
 	router.Get("/game/{id}", func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-
-		// Get or create the KeyValue bucket for "games"
-		gamesKV, err := js.KeyValue(ctx, "games")
-		if err != nil {
-			respondError(w, http.StatusInternalServerError, "error accessing key-value store: %v", err)
-			return
-		}
 
 		// Retrieve the session ID
 		sessionId, err := getSessionID(store, r)
@@ -72,16 +71,39 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 			}
 		}
 
-		// Debugging information
-		fmt.Printf("Game ID: %s, Game State: %+v\n", mvc.Id, mvc)
-
 		// Render the game page
 		components.GameMVCView(mvc, sessionId).Render(ctx, w)
 	})
 
-	router.Route("/api", func(apiRouter chi.Router) {
+	// router.Get("/test/game/{id}", func(w http.ResponseWriter, r *http.Request) {
+	// 	ctx := r.Context()
 
-	})
+	// 	// Retrieve the game ID from the URL
+	// 	id := chi.URLParam(r, "id")
+	// 	if id == "" {
+	// 		respondError(w, http.StatusBadRequest, "missing 'id' parameter")
+	// 		return
+	// 	}
+
+	// 	// Watch updates for the specific key
+	// 	watcher, err := gamesKV.Watch(ctx, id)
+	// 	if err != nil {
+	// 		log.Fatalf("Error starting watcher: %v", err)
+	// 	}
+	// 	defer watcher.Stop()
+
+	// 	// Process updates
+	// 	for update := range watcher.Updates() {
+	// 		if update == nil {
+	// 			// End of updates (e.g., the watcher was stopped)
+	// 			fmt.Println("Watcher stopped or no more updates.")
+	// 			return
+	// 		}
+
+	// 		// Process the update (you can add your processing logic here)
+	// 		fmt.Printf("Received update: %+v\n", update)
+	// 	}
+	// })
 
 	return nil
 }

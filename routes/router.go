@@ -57,6 +57,30 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 		return nil, err
 	}
 
+	// Create or update the "games" KV bucket
+	_, err = js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
+		Bucket:      "games",
+		Description: "Datastar Tic Tac Toe Game",
+		Compression: true,
+		TTL:         time.Hour,
+		MaxBytes:    16 * 1024 * 1024,
+	})
+	if err != nil {
+		return cleanup, fmt.Errorf("error creating key value: %w", err)
+	}
+
+	// Create or update the "users" KV bucket
+	_, err = js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
+		Bucket:      "users",
+		Description: "Datastar Tic Tac Toe Game",
+		Compression: true,
+		TTL:         time.Hour,
+		MaxBytes:    16 * 1024 * 1024,
+	})
+	if err != nil {
+		return cleanup, fmt.Errorf("error creating key value: %w", err)
+	}
+
 	if err := errors.Join(
 		setupIndexRoute(router, sessionStore, js),
 		setupGameRoute(router, sessionStore, js),

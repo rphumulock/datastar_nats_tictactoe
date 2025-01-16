@@ -24,29 +24,15 @@ type User struct {
 }
 
 func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetStream) error {
+	ctx := context.Background()
 
-	// Create or update the "games" KV bucket
-	gamesKV, err := js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
-		Bucket:      "games",
-		Description: "Datastar Tic Tac Toe Game",
-		Compression: true,
-		TTL:         time.Hour,
-		MaxBytes:    16 * 1024 * 1024,
-	})
+	gamesKV, err := js.KeyValue(ctx, "games")
 	if err != nil {
-		return fmt.Errorf("error creating key value: %w", err)
+		return fmt.Errorf("failed to get games key value: %w", err)
 	}
-
-	// Create or update the "games" KV bucket
-	userKV, err := js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
-		Bucket:      "users",
-		Description: "Datastar Tic Tac Toe Game",
-		Compression: true,
-		TTL:         time.Hour,
-		MaxBytes:    16 * 1024 * 1024,
-	})
+	usersKV, err := js.KeyValue(ctx, "users")
 	if err != nil {
-		return fmt.Errorf("error creating key value: %w", err)
+		return fmt.Errorf("failed to get games key value: %w", err)
 	}
 
 	// Save MVC state to the "game1" key in the "games" bucket
@@ -67,7 +53,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 		if err != nil {
 			return fmt.Errorf("failed to marshal mvc: %w", err)
 		}
-		if _, err := userKV.Put(ctx, user.SessionID, b); err != nil {
+		if _, err := usersKV.Put(ctx, user.SessionID, b); err != nil {
 			return fmt.Errorf("failed to put key value: %w", err)
 		}
 		return nil
@@ -378,130 +364,3 @@ func createSessionID(store sessions.Store, r *http.Request, w http.ResponseWrite
 	}
 	return id, nil
 }
-
-// Upsert user session: Checks if a session exists; creates one if it doesn't
-// func upsertSessionID(store sessions.Store, r *http.Request, w http.ResponseWriter) (string, error) {
-// 	id, err := getSessionID(store, r)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	if id != "" {
-// 		return id, nil // Session already exists
-// 	}
-// 	return createSessionID(store, r, w) // Create a new session
-// }
-
-// 	// // Process the entry
-// 	switch update.Operation() {
-// 	case jetstream.KeyValuePut:
-
-// 		if historicalMode {
-
-// 			if update.Key() == sessionId {
-
-// 				sse.RemoveFragments("#game-"+update.Key(),
-// 					datastar.WithRemoveSettleDuration(1*time.Millisecond),
-// 				)
-
-// 				mvc := &components.GameState{}
-// 				if err := json.Unmarshal(update.Value(), mvc); err != nil {
-// 					http.Error(w, err.Error(), http.StatusInternalServerError)
-// 					return
-// 				}
-
-// 				c := components.HostedGame(mvc, sessionId)
-// 				if err := sse.MergeFragmentTempl(c,
-// 					datastar.WithSelectorID("games-list-container"),
-// 					datastar.WithMergeAppend(),
-// 				); err != nil {
-// 					sse.ConsoleError(err)
-// 					return
-// 				}
-
-// 			} else {
-// 				sse.RemoveFragments("#game-"+update.Key(),
-// 					datastar.WithRemoveSettleDuration(1*time.Millisecond),
-// 				)
-
-// 				mvc := &components.GameState{}
-// 				if err := json.Unmarshal(update.Value(), mvc); err != nil {
-// 					http.Error(w, err.Error(), http.StatusInternalServerError)
-// 					return
-// 				}
-
-// 				c := components.JoinGame(mvc, sessionId)
-// 				if err := sse.MergeFragmentTempl(c,
-// 					datastar.WithSelectorID("games-list-container"),
-// 					datastar.WithMergeAppend(),
-// 				); err != nil {
-// 					sse.ConsoleError(err)
-// 					return
-// 				}
-// 			}
-// 		} else {
-// 			if update.Key() == sessionId {
-
-// 				sse.ExecuteScript("window.location.assign('/game/" + sessionId + "')")
-
-// 			} else {
-// 				mvc := &components.GameState{}
-// 				if err := json.Unmarshal(update.Value(), mvc); err != nil {
-// 					http.Error(w, err.Error(), http.StatusInternalServerError)
-// 					return
-// 				}
-
-// 				c := components.JoinGame(mvc, sessionId)
-// 				if err := sse.MergeFragmentTempl(c,
-// 					datastar.WithSelectorID("games-list-container"),
-// 					datastar.WithMergeAppend(),
-// 				); err != nil {
-// 					sse.ConsoleError(err)
-// 					return
-// 				}
-// 			}
-// 		}
-
-// 	case jetstream.KeyValueDelete:
-// 		if historicalMode {
-// 			fmt.Printf("Ignoring historical delete for key: %s\n", update.Key())
-// 			continue
-// 		} else {
-// 			if err := sse.RemoveFragments("#game-"+update.Key(),
-// 				datastar.WithRemoveSettleDuration(1*time.Millisecond),
-// 				datastar.WithRemoveUseViewTransitions(true)); err != nil {
-// 				sse.ConsoleError(err)
-// 				return
-// 			}
-// 		}
-
-// 	}
-// }
-
-// Process updates
-
-// gameRouter.Get("/{id}/join", func(w http.ResponseWriter, r *http.Request) {
-// 	ctx := r.Context()
-
-// 	// Extract the "id" parameter from the URL
-// 	id := chi.URLParam(r, "id")
-// 	if id == "" {
-// 		http.Error(w, "missing 'id' parameter", http.StatusBadRequest)
-// 		return
-// 	}
-// 	log.Printf("id: %s", id)
-
-// 	// Delete the specified key from the "games" bucket
-// 	if err := gamesKV.Delete(ctx, id); err != nil {
-// 		http.Error(w, fmt.Sprintf("failed to delete key '%s': %v", id, err), http.StatusInternalServerError)
-// 		return
-// 	}
-// })
-
-// // Helper function to marshal data as JSON
-// func MustJSONMarshal(v any) string {
-// 	b, err := json.MarshalIndent(v, "", " ")
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	return string(b)
-// }

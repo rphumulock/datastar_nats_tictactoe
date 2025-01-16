@@ -4,6 +4,7 @@ import (
 	"fmt"
 	datastar "github.com/starfederation/datastar/code/go/sdk"
 	"github.com/zangster300/northstar/web/layouts"
+	"log"
 )
 
 type GameState struct {
@@ -38,12 +39,22 @@ templ InitGame(sessionId string) {
 }
 
 templ GameMVCView(mvc *GameState, sessionId string) {
+	{{
+		store := mvc.Board
+		log.Println("Board", store)
+	}}
 	@layouts.Base() {
-		<div id="game-container" class="h-full w-3/4 relative border border-solid border-primary rounded p-2 my-2 mx-28">
+		<div id="game-container" class="h-full w-3/4 relative border border-solid border-primary rounded p-2 my-2 mx-28" data-store="{clicks: 0}">
 			<div class="flex flex-col w-full h-full gap-4">
 				<div class="container mx-auto flex items-center justify-between">
 					<span class="text-xl font-semibold">Tic Tac Toe - Game: { mvc.Id }</span>
 					<div id="user-session-container">Hello { sessionId }!</div>
+					<div data-text="$clicks"></div>
+					<div
+						id="games-list-container"
+						class="space-y-6"
+						data-on-load={ fmt.Sprintf("$get('/test/game/%s')", mvc.Id) }
+					></div>
 				</div>
 				<section class="flex flex-col w-full h-full gap-2">
 					<div class="grid grid-cols-3 grid-rows-3 gap-2 w-full h-full mt-4">
@@ -55,7 +66,7 @@ templ GameMVCView(mvc *GameState, sessionId string) {
 				<footer class="flex justify-center text-xs">
 					<button
 						class="btn btn-primary text-lg"
-						data-on-click={ datastar.PostSSE("/api/game/reset") }
+						data-on-click={ datastar.PostSSE("api/game/reset") }
 					>
 						Reset
 					</button>
@@ -108,7 +119,7 @@ templ Cell(cell string, i int) {
 				"border-secondary border-8":       clicked,
 			},
 		}
-		data-on-click={ datastar.PostSSE("/api/game/%d/toggle", i) }
+		data-on-click={ datastar.PostSSE("/test/game//api/game/%d/toggle", i) }
 		if cell != "" {
 			disabled
 		}
