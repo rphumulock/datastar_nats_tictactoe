@@ -1,0 +1,61 @@
+
+
+package components 
+
+import (
+	"fmt"
+	datastar "github.com/starfederation/datastar/code/go/sdk"
+)
+
+templ InitGame(sessionId string) {
+	<div id="main-container" class="flex flex-col items-center justify-center">
+		<div class="text-center text-3xl font-bold mb-6">
+			Welcome, { sessionId }
+		</div>
+		<button
+			class="btn btn-primary text-lg"
+			data-on-click={ datastar.PostSSE("/api/game/create") }
+		>
+			Create Game
+		</button>
+		<section class="w-1/2 m-8 p-6 bg-base-300 border-4 border-accent-content shadow-lg rounded-lg h-[32rem] overflow-y-scroll">
+			<h2 class="text-2xl text-secondary-content text-bg-base mb-6">Active Games</h2>
+			<div
+				id="games-list-container"
+				class="space-y-6"
+				data-on-load="$get('/api/games')"
+			></div>
+		</section>
+	</div>
+}
+
+templ RemoveGame(mvc *GameState) {
+	{{ id := fmt.Sprintf("game-%s", mvc.Id) }}
+	<div id={ id }>
+		{ mvc.Id }
+	</div>
+}
+
+templ JoinGame(mvc *GameState, sessionId string) {
+	{{
+		gameFull := mvc.Players[1] != "" && mvc.Players[0] != sessionId && mvc.Players[1] != sessionId
+		id := fmt.Sprintf("game-%s", mvc.Id)
+	}}
+	<div id={ id } class="p-4 bg-gray-100 rounded-lg shadow">
+		<h3 class="text-lg font-semibold text-gray-700">{ mvc.Id }</h3>
+		if gameFull {
+			<p class="text-red-500">Game is full</p>
+		} else {
+			<a class="btn btn-primary mt-4 w-full" href={ templ.URL(fmt.Sprintf("/game/%s", mvc.Id)) }>Join Game</a>
+		}
+	</div>
+}
+
+templ HostedGame(mvc *GameState, sessionId string) {
+	{{ id := fmt.Sprintf("game-%s", mvc.Id) }}
+	<div id={ id } class="p-4 bg-gray-100 rounded-lg shadow">
+		<h3 class="text-lg font-semibold text-gray-700">{ mvc.Id }</h3>
+		<a class="btn btn-primary mt-4 w-full" href={ templ.URL(fmt.Sprintf("/game/%s", sessionId)) }>Join Game</a>
+		<button class="btn btn-error mt-4 w-full" data-on-click={ datastar.DeleteSSE("/api/game/%s/delete", mvc.Id) }>Delete</button>
+	</div>
+}

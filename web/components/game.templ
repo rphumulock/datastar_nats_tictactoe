@@ -4,7 +4,6 @@ import (
 	"fmt"
 	datastar "github.com/starfederation/datastar/code/go/sdk"
 	"github.com/zangster300/northstar/web/layouts"
-	"log"
 )
 
 type GameState struct {
@@ -15,56 +14,94 @@ type GameState struct {
 	Winner  string    `json:"winner"`
 }
 
-// ------------------------------------------
-templ InitGame(sessionId string) {
-	<div id="main-container" class="flex flex-col items-center justify-center">
-		<div class="text-center text-3xl font-bold mb-6">
-			Welcome, { sessionId }
-		</div>
-		<button
-			class="btn btn-primary text-lg"
-			data-on-click={ datastar.PostSSE("/api/game/create") }
-		>
-			Create Game
-		</button>
-		<section class="w-1/2 m-8 p-6 bg-base-300 border-4 border-accent-content shadow-lg rounded-lg h-[32rem] overflow-y-scroll">
-			<h2 class="text-2xl text-secondary-content text-bg-base mb-6">Active Games</h2>
-			<div
-				id="games-list-container"
-				class="space-y-6"
-				data-on-load="$get('/api/games')"
-			></div>
-		</section>
-	</div>
-}
+// templ GameMVCView(mvc *GameState, sessionId string) {
+// 	{{
+// 		gameId := mvc.Id
+// 	}}
+// 	@layouts.Base() {
+// 		<div class="h-full w-3/4 relative border border-solid border-primary rounded p-2 my-2 mx-28" data-on-load={ datastar.GetSSE("/game/%s/watch", gameId) }>
+// 			<div class="flex flex-col w-full h-full gap-4">
+// 				<div class="container mx-auto flex items-center justify-between">
+// 					<span class="text-xl font-semibold">Tic Tac Toe - Game: { gameId }</span>
+// 					<div id="user-session-container">Hello { sessionId }!</div>
+// 				</div>
+// 				<section class="flex flex-col w-full h-full gap-2">
+// 					@GameBoard(mvc, sessionId)
+// 				</section>
+// 				<footer class="flex justify-center text-xs">
+// 					<button
+// 						class="btn btn-primary text-lg"
+// 						data-on-click={ datastar.PostSSE("api/game/reset") }
+// 					>
+// 						Reset
+// 					</button>
+// 				</footer>
+// 			</div>
+// 		</div>
+// 	}
+// }
 
+// templ GameBoard(gameState *GameState, sessionId string) {
+// 	{{
+// 		gameId := gameState.Id
+// 		board := gameState.Board
+// 	}}
+// 	<div id="game-container" class="grid grid-cols-3 grid-rows-3 gap-2 w-full h-full mt-4">
+// 		for i, cell := range board {
+// 			@Cell(gameId, cell, i, gameState, sessionId)
+// 		}
+// 	</div>
+// }
+
+// templ Cell(id string, cell string, i int, gameState *GameState, sessionId string) {
+// 	{{
+// 		clicked := cell != ""
+// 	}}
+// 	<button
+// 		id={ "cell-" + fmt.Sprintf("%d", i) }
+// 		class={
+// 			"w-full h-full border-primary flex items-center justify-center text-5xl font-semibold cursor-pointer",
+// 			map[string]bool{
+// 				"hover:border-gray-100 border-2 ": !clicked,
+// 				"border-secondary border-8":       clicked,
+// 			},
+// 		}
+// 		data-on-click={ datastar.PostSSE("/game/%s/toggle/%d", id, i) }
+// 		if cell != "" {
+// 			disabled
+// 		}
+// 	>
+// 		{ cell }
+// 	</button>
+// }
 templ GameMVCView(mvc *GameState, sessionId string) {
 	{{
 		gameId := mvc.Id
-		board := mvc.Board
-
-		log.Println("Board", board)
+		winner := mvc.Winner
+		isWinner := winner != ""
 	}}
 	@layouts.Base() {
-		<div id="game-container" class="h-full w-3/4 relative border border-solid border-primary rounded p-2 my-2 mx-28" data-store="{clicks: 0}">
-			<div class="flex flex-col w-full h-full gap-4">
+		<div
+			class="h-full w-3/4 relative border border-solid border-primary rounded p-2 my-2 mx-28"
+			data-on-load={ datastar.GetSSE("/game/%s/watch", gameId) }
+		>
+			<div class="flex flex-col w-full h-full gap-4 relative">
+				<!-- Game Header -->
 				<div class="container mx-auto flex items-center justify-between">
-					<span class="text-xl font-semibold">Tic Tac Toe - Game: { gameId }</span>
-					<div id="user-session-container">Hello { sessionId }!</div>
+					<span class="text-xl font-semibold text-primary">Tic Tac Toe - Game: { gameId }</span>
+					<div id="user-session-container" class="text-secondary">Hello, { sessionId }!</div>
 				</div>
+				<!-- Game Board -->
 				<section class="flex flex-col w-full h-full gap-2">
-					<div class="grid grid-cols-3 grid-rows-3 gap-2 w-full h-full mt-4">
-						for i, cell := range board {
-							@Cell(gameId, cell, i)
-						}
-					</div>
+					@GameBoard(mvc, sessionId)
 				</section>
+				<!-- Game Footer -->
 				<footer class="flex justify-center text-xs">
 					<button
 						class="btn btn-primary text-lg"
 						data-on-click={ datastar.PostSSE("api/game/reset") }
 					>
-						Reset
+						Reset Game
 					</button>
 				</footer>
 			</div>
@@ -72,54 +109,45 @@ templ GameMVCView(mvc *GameState, sessionId string) {
 	}
 }
 
-templ RemoveGame(mvc *GameState) {
-	{{ id := fmt.Sprintf("game-%s", mvc.Id) }}
-	<div id={ id }>
-		{ mvc.Id }
-	</div>
-}
-
-templ JoinGame(mvc *GameState, sessionId string) {
+templ GameBoard(gameState *GameState, sessionId string) {
 	{{
-		gameFull := mvc.Players[1] != "" && mvc.Players[0] != sessionId && mvc.Players[1] != sessionId
-		id := fmt.Sprintf("game-%s", mvc.Id)
+		gameId := gameState.Id
+		board := gameState.Board
 	}}
-	<div id={ id } class="p-4 bg-gray-100 rounded-lg shadow">
-		<h3 class="text-lg font-semibold text-gray-700">{ mvc.Id }</h3>
-		if gameFull {
-			<p class="text-red-500">Game is full</p>
-		} else {
-			<a class="btn btn-primary mt-4 w-full" href={ templ.URL(fmt.Sprintf("/game/%s", mvc.Id)) }>Join Game</a>
+	<div id="game-container" class="grid grid-cols-3 grid-rows-3 gap-4 w-full h-full mt-4">
+		for i, cell := range board {
+			@Cell(gameId, cell, i, gameState, sessionId)
 		}
 	</div>
 }
 
-templ HostedGame(mvc *GameState, sessionId string) {
-	{{ id := fmt.Sprintf("game-%s", mvc.Id) }}
-	<div id={ id } class="p-4 bg-gray-100 rounded-lg shadow">
-		<h3 class="text-lg font-semibold text-gray-700">{ mvc.Id }</h3>
-		<a class="btn btn-primary mt-4 w-full" href={ templ.URL(fmt.Sprintf("/game/%s", sessionId)) }>Join Game</a>
-		<button class="btn btn-error mt-4 w-full" data-on-click={ datastar.DeleteSSE("/api/game/%s/delete", mvc.Id) }>Delete</button>
-	</div>
-}
-
-templ Cell(id string, cell string, i int) {
+templ Cell(id string, cell string, i int, gameState *GameState, sessionId string) {
 	{{
 		clicked := cell != ""
+		isWinner := gameState.Winner != ""
 	}}
 	<button
+		id={ "cell-" + fmt.Sprintf("%d", i) }
 		class={
-			"w-full h-full border-primary flex items-center justify-center text-5xl font-semibold cursor-pointer",
+			"w-full h-full border-4 flex items-center justify-center text-5xl font-semibold cursor-pointer rounded-lg transition-transform duration-300",
 			map[string]bool{
-				"hover:border-gray-100 border-2 ": !clicked,
-				"border-secondary border-8":       clicked,
+				"hover:border-gray-100 border-primary hover:scale-105": !clicked && !isWinner,
+				"border-secondary bg-gray-200 text-gray-800 scale-100": clicked && !isWinner,
+				"bg-green-500 text-white animate-bounce":               isWinner && clicked,
 			},
 		}
 		data-on-click={ datastar.PostSSE("/game/%s/toggle/%d", id, i) }
-		if cell != "" {
+		if cell != "" || isWinner {
 			disabled
 		}
 	>
 		{ cell }
 	</button>
 }
+
+
+if isWinner {
+					<div class="absolute inset-0 flex items-center justify-center bg-opacity-80 bg-green-500 text-white text-4xl font-bold z-10">
+						<span>🎉 { winner } Wins! 🎉</span>
+					</div>
+				}
