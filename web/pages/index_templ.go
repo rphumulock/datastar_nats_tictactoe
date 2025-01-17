@@ -10,7 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	datastar "github.com/starfederation/datastar/code/go/sdk"
-	"github.com/zangster300/northstar/web/layouts"
+	"github.com/rphumulock/natastar/web/layouts"
 )
 
 func Login() templ.Component {

@@ -11,8 +11,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/rphumulock/natastar/web/components"
 	datastar "github.com/starfederation/datastar/code/go/sdk"
-	"github.com/zangster300/northstar/web/components"
 )
 
 func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStream) error {

@@ -14,8 +14,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/zangster300/northstar/web/components"
-	"github.com/zangster300/northstar/web/pages"
+	"github.com/rphumulock/natastar/web/components"
+	"github.com/rphumulock/natastar/web/pages"
 )
 
 type User struct {

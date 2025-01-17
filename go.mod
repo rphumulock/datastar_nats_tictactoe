@@ -1,4 +1,4 @@
-module github.com/zangster300/northstar
+module github.com/rphumulock/natastar
 
 go 1.23.3
 
