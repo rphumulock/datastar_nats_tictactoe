@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
-	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	datastar "github.com/starfederation/datastar/code/go/sdk"
 	"github.com/zangster300/northstar/web/components"
@@ -24,50 +23,11 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 		return fmt.Errorf("failed to get games key-value store: %w", err)
 	}
 
-	type contextKey string
-	const gameStateKey contextKey = "gameState"
-
-	// Middleware to fetch game state using {id} and store it in context
-	gameRouterMiddlewareFetchState := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			id := chi.URLParam(r, "id")
-			if id == "" {
-				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
-				return
-			}
-
-			entry, err := gamesKV.Get(ctx, id)
-			if err != nil {
-				if err == nats.ErrKeyNotFound {
-					respondError(w, http.StatusNotFound, "game with id '%s' not found", id)
-					return
-				}
-				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
-				return
-			}
-
-			mvc := &components.GameState{}
-			if err := json.Unmarshal(entry.Value(), mvc); err != nil {
-				respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
-				return
-			}
-
-			ctx := context.WithValue(r.Context(), gameStateKey, mvc)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
-
 	// Define /game/{id} routes
 	router.Route("/game/{id}", func(gameRouter chi.Router) {
-		gameRouter.Use(gameRouterMiddlewareFetchState)
 
 		gameRouter.Get("/watch", func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-
-			sse := datastar.NewSSE(w, r)
-
 			id := chi.URLParam(r, "id")
-
 			if id == "" {
 				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
 				return
@@ -79,7 +39,8 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			watcher, err := gamesKV.WatchAll(ctx)
+			sse := datastar.NewSSE(w, r)
+			watcher, err := gamesKV.WatchAll(r.Context())
 			if err != nil {
 				http.Error(w, fmt.Sprintf("Failed to start watcher: %v", err), http.StatusInternalServerError)
 				return
@@ -88,7 +49,6 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 
 			// Process updates
 			for update := range watcher.Updates() {
-				// `nil` signals the end of the historical replay
 				if update == nil {
 					fmt.Println("End of historical updates. Now receiving live updates...")
 					continue
@@ -102,27 +62,44 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 						continue
 					}
 
-					log.Printf("X is next update: %t", mvc.XIsNext)
+					log.Printf("Received update for game %v", mvc)
 
-					c := components.GameBoard(mvc, sessionId)
-					if err := sse.MergeFragmentTempl(c,
-						datastar.WithSelectorID("game-container"),
-						datastar.WithMergeMorph(),
-					); err != nil {
-						sse.ConsoleError(err)
+					if mvc.Id != id {
+						continue
 					}
 
+					if mvc.Winner != "" {
+						c := components.GameWinner(mvc, sessionId)
+						if err := sse.MergeFragmentTempl(c,
+							datastar.WithSelectorID("game-container"),
+							datastar.WithMergeMorph(),
+						); err != nil {
+							sse.ConsoleError(err)
+						}
+					} else {
+						c := components.GameBoard(mvc, sessionId)
+						if err := sse.MergeFragmentTempl(c,
+							datastar.WithSelectorID("game-container"),
+							datastar.WithMergeMorph(),
+						); err != nil {
+							sse.ConsoleError(err)
+						}
+					}
 				case jetstream.KeyValueDelete:
 				}
-
 			}
 		})
 
-		// Game state route
 		gameRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			mvc, ok := r.Context().Value(gameStateKey).(*components.GameState)
-			if !ok {
-				respondError(w, http.StatusInternalServerError, "game state not found in context")
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
+				return
+			}
+
+			mvc, err := fetchGameState(ctx, gamesKV, id)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
 				return
 			}
 
@@ -148,11 +125,16 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 			components.GameMVCView(mvc, sessionId).Render(ctx, w)
 		})
 
-		// Toggle cell route
 		gameRouter.Post("/toggle/{cell}", func(w http.ResponseWriter, r *http.Request) {
-			mvc, ok := r.Context().Value(gameStateKey).(*components.GameState)
-			if !ok {
-				respondError(w, http.StatusInternalServerError, "game state not found in context")
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
+				return
+			}
+
+			mvc, err := fetchGameState(ctx, gamesKV, id)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
 				return
 			}
 
@@ -169,13 +151,11 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			// Ensure the cell is not already occupied
 			if mvc.Board[i] != "" {
 				respondError(w, http.StatusBadRequest, "cell already occupied")
 				return
 			}
 
-			// Ensure the current player is valid
 			if mvc.XIsNext && sessionId != mvc.Players[0] {
 				respondError(w, http.StatusForbidden, "not your turn")
 				return
@@ -185,7 +165,6 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			// Update the board and toggle the turn
 			if mvc.XIsNext {
 				mvc.Board[i] = "X"
 			} else {
@@ -193,14 +172,12 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 			}
 			mvc.XIsNext = !mvc.XIsNext
 
-			// Check for a winner
 			winner := checkWinner(mvc.Board[:])
 			if winner != "" {
 				mvc.Winner = winner
 				log.Printf("Game over! Winner: %s", winner)
 			}
 
-			// Save updated game state
 			if err := updateGameState(ctx, gamesKV, mvc); err != nil {
 				respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
 				return
@@ -210,9 +187,15 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 		})
 
 		gameRouter.Post("/reset", func(w http.ResponseWriter, r *http.Request) {
-			mvc, ok := r.Context().Value(gameStateKey).(*components.GameState)
-			if !ok {
-				respondError(w, http.StatusInternalServerError, "game state not found in context")
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
+				return
+			}
+
+			mvc, err := fetchGameState(ctx, gamesKV, id)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
 				return
 			}
 
@@ -222,45 +205,15 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			cell := chi.URLParam(r, "cell")
-			i, err := strconv.Atoi(cell)
-			if err != nil || i < 0 || i >= len(mvc.Board) {
-				respondError(w, http.StatusBadRequest, "invalid cell index")
+			if sessionId != mvc.Players[0] {
+				respondError(w, http.StatusForbidden, "not your game")
 				return
 			}
 
-			// Ensure the cell is not already occupied
-			if mvc.Board[i] != "" {
-				respondError(w, http.StatusBadRequest, "cell already occupied")
-				return
-			}
+			mvc.Board = [9]string{"", "", "", "", "", "", "", "", ""}
+			mvc.Winner = ""
+			mvc.XIsNext = true
 
-			// Ensure the current player is valid
-			if mvc.XIsNext && sessionId != mvc.Players[0] {
-				respondError(w, http.StatusForbidden, "not your turn")
-				return
-			}
-			if !mvc.XIsNext && sessionId != mvc.Players[1] {
-				respondError(w, http.StatusForbidden, "not your turn")
-				return
-			}
-
-			// Update the board and toggle the turn
-			if mvc.XIsNext {
-				mvc.Board[i] = "X"
-			} else {
-				mvc.Board[i] = "O"
-			}
-			mvc.XIsNext = !mvc.XIsNext
-
-			// Check for a winner
-			winner := checkWinner(mvc.Board[:])
-			if winner != "" {
-				mvc.Winner = winner
-				log.Printf("Game over! Winner: %s", winner)
-			}
-
-			// Save updated game state
 			if err := updateGameState(ctx, gamesKV, mvc); err != nil {
 				respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
 				return
@@ -268,10 +221,23 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 
 			w.WriteHeader(http.StatusOK)
 		})
-
 	})
 
 	return nil
+}
+
+func fetchGameState(ctx context.Context, gamesKV jetstream.KeyValue, id string) (*components.GameState, error) {
+	entry, err := gamesKV.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	mvc := &components.GameState{}
+	if err := json.Unmarshal(entry.Value(), mvc); err != nil {
+		return nil, fmt.Errorf("error unmarshalling game state: %w", err)
+	}
+
+	return mvc, nil
 }
 
 func checkWinner(board []string) string {

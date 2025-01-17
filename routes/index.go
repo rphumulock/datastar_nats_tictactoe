@@ -204,7 +204,6 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 			})
 		})
 
-		fmt.Println("All keys have been deleted.")
 		// Watch for updates to the "games" bucket
 		apiRouter.Route("/games", func(gameRouter chi.Router) {
 			gameRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
