@@ -2,8 +2,8 @@ package components
 
 import (
 	"fmt"
-	"github.com/rphumulock/natastar/web/layouts"
-	datastar "github.com/starfederation/datastar/code/go/sdk"
+	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
+	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
 type GameState struct {
@@ -97,16 +97,24 @@ templ GameWinner(gameState *GameState, sessionId string) {
 		role="dialog"
 	>
 		<!-- Winner Announcement -->
-		<h1 class="text-5xl font-extrabold mb-6 animate-bounce">
-			🎉 { winner } Wins! 🎉
-		</h1>
+		if (winner == "TIE") {
+			<h1 class="text-5xl font-extrabold mb-6 animate-bounce">
+				🤝 It's a Tie! 🤝
+			</h1>
+		} else {
+			<h1 class="text-5xl font-extrabold mb-6 animate-bounce">
+				🎉 { winner } Wins! 🎉
+			</h1>
+		}
 		<!-- Play Again Button -->
-		<button
-			class="btn btn-primary text-xl px-6 py-3 mb-4"
-			data-on-click={ datastar.PostSSE("/game/%s/reset", gameId) }
-		>
-			Play Again
-		</button>
+		if (sessionId == gameId) {
+			<button
+				class="btn btn-primary text-xl px-6 py-3 mb-4"
+				data-on-click={ datastar.PostSSE("/game/%s/reset", gameId) }
+			>
+				Play Again
+			</button>
+		}
 		<!-- Back to Dashboard Button -->
 		<a
 			class="btn btn-secondary text-xl px-6 py-3"

@@ -11,7 +11,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"fmt"
-	datastar "github.com/starfederation/datastar/code/go/sdk"
+	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
 func InitGame(sessionId string) templ.Component {

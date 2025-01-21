@@ -8,14 +8,13 @@ import (
 	"net/http"
 	"time"
 
-	datastar "github.com/starfederation/datastar/code/go/sdk"
-
 	"github.com/delaneyj/toolbelt"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/rphumulock/natastar/web/components"
-	"github.com/rphumulock/natastar/web/pages"
+	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
+	"github.com/rphumulock/datastar_nats_tictactoe/web/pages"
+	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
 type User struct {

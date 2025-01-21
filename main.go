@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/rphumulock/natastar/routes"
+	"github.com/rphumulock/datastar_nats_tictactoe/routes"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -24,7 +24,7 @@ func main() {
 		}
 		return "8080"
 	}
-	logger.Info(fmt.Sprintf("Starting Server 0.0.0.0:" + getPort()))
+	logger.Info(fmt.Sprintf("Starting Server 0.0.0.0:%s", getPort()))
 	defer logger.Info("Stopping Server")
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

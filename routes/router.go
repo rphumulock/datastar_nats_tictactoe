@@ -11,19 +11,15 @@ import (
 	"github.com/delaneyj/toolbelt/embeddednats"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
-	natsserver "github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go/jetstream"
 )
 
 func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (cleanup func() error, err error) {
-	natsPort, err := 33823, nil
-	if err != nil {
-		return nil, fmt.Errorf("error getting free port: %w", err)
-	}
+	natsPort := 33823
 
 	log.Printf("Starting on Nats server %d", natsPort)
-
-	ns, err := embeddednats.New(ctx, embeddednats.WithNATSServerOptions(&natsserver.Options{
+	ns, err := embeddednats.New(ctx, embeddednats.WithNATSServerOptions(&server.Options{
 		JetStream: true,
 		Port:      natsPort,
 	}))
@@ -62,7 +58,7 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 		Bucket:      "games",
 		Description: "Datastar Tic Tac Toe Game",
 		Compression: true,
-		TTL:         time.Hour,
+		TTL:         time.Minute * 20,
 		MaxBytes:    16 * 1024 * 1024,
 	})
 	if err != nil {

@@ -1,4 +1,4 @@
-app = "Natastar-Tictactoe"
+app = "datastar_nats_tictactoe"
 primary_region = "den"
 
 [env]

@@ -1,8 +1,8 @@
 package pages
 
 import (
-	"github.com/rphumulock/natastar/web/layouts"
-	datastar "github.com/starfederation/datastar/code/go/sdk"
+	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
+	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
 templ Login() {
@@ -15,7 +15,7 @@ templ Login() {
 				</div>
 			</nav>
 			<div id="main-container" class="flex flex-col items-center justify-center">
-				<button class="btn btn-primary px-8 text-lg text-center" data-on-click="$get('/api/login')">
+				<button class="btn btn-primary px-8 text-lg text-center" data-on-click="@get('/api/login')">
 					Login
 				</button>
 			</div>
@@ -53,7 +53,7 @@ templ Dashboard(sessionId string) {
 					<div
 						id="games-list-container"
 						class="space-y-6"
-						data-on-load="$get('/api/games')"
+						data-on-load="@get('/api/games')"
 					></div>
 				</section>
 			</div>

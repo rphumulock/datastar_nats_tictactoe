@@ -4,7 +4,7 @@ package components
 
 import (
 	"fmt"
-	datastar "github.com/starfederation/datastar/code/go/sdk"
+	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
 templ InitGame(sessionId string) {
@@ -23,7 +23,7 @@ templ InitGame(sessionId string) {
 			<div
 				id="games-list-container"
 				class="space-y-6"
-				data-on-load="$get('/api/games')"
+				data-on-load="@get('/api/games')"
 			></div>
 		</section>
 	</div>

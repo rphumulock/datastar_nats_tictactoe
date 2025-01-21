@@ -9,8 +9,8 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
-	datastar "github.com/starfederation/datastar/code/go/sdk"
-	"github.com/rphumulock/natastar/web/layouts"
+	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
+	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
 func Login() templ.Component {

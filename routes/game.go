@@ -11,8 +11,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/rphumulock/natastar/web/components"
-	datastar "github.com/starfederation/datastar/code/go/sdk"
+	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
+	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
 func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStream) error {
@@ -173,7 +173,10 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 			mvc.XIsNext = !mvc.XIsNext
 
 			winner := checkWinner(mvc.Board[:])
-			if winner != "" {
+			if winner == "TIE" {
+				mvc.Winner = "TIE"
+				log.Printf("Game over! Result: Tie")
+			} else if winner != "" {
 				mvc.Winner = winner
 				log.Printf("Game over! Winner: %s", winner)
 			}
@@ -252,6 +255,9 @@ func checkWinner(board []string) string {
 		{2, 4, 6}, // Top-right to bottom-left diagonal
 	}
 
+	boardFull := true // Assume the board is full initially
+
+	// Check for a winner and simultaneously check if the board is full
 	for _, combination := range winningCombinations {
 		if board[combination[0]] != "" &&
 			board[combination[0]] == board[combination[1]] &&
@@ -260,7 +266,19 @@ func checkWinner(board []string) string {
 		}
 	}
 
-	return "" // No winner
+	// Check if the board is full
+	for _, cell := range board {
+		if cell == "" {
+			boardFull = false
+			break
+		}
+	}
+
+	if boardFull {
+		return "TIE" // Board is full and no winner
+	}
+
+	return "" // No winner yet and moves still possible
 }
 
 // Helper functions

@@ -15,10 +15,6 @@ tasks:
     cmds:
       - pnpx tailwindcss -c tailwind.config.js -i web/styles/styles.css -o $STATIC_DIR/index.css
 
-  build:esbuild:
-    cmds:
-      - pnpx esbuild web/libs/datastar/index.ts --bundle --outdir=$STATIC_DIR
-
   build:
     cmds:
       - go build -o bin/main .
@@ -46,10 +42,6 @@ tasks:
     cmds:
       - pnpx tailwindcss -c tailwind.config.js -i web/styles/styles.css -o $STATIC_DIR/index.css --watch
 
-  live:esbuild:
-    cmds:
-      - pnpx esbuild web/libs/datastar/index.ts --sourcemap --bundle --outdir=$STATIC_DIR --watch
-
   live:server:
     cmds:
       - |
@@ -71,13 +63,12 @@ tasks:
         --build.delay "100" \
         --build.exclude_dir "" \
         --build.include_dir "$STATIC_DIR" \
-        --build.include_ext "js,css"
+        --build.include_ext "css"
 
   live:
     deps:
       - live:templ
       - live:styles
-      - live:esbuild
       - live:reload
       - live:server
 
@@ -86,3 +77,7 @@ tasks:
       - ./bin/main
     deps:
       - build
+
+  default:
+    deps:
+      - run
