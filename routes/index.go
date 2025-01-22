@@ -107,8 +107,6 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 		dashboardRouter.Route("/lobby", func(lobbyRouter chi.Router) {
 
 			lobbyRouter.Post("/create", func(w http.ResponseWriter, r *http.Request) {
-				sse := datastar.NewSSE(w, r)
-
 				SessionId, err := getSessionID(store, r)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -132,12 +130,10 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 					http.Error(w, fmt.Sprintf("failed to put key value: %v", err), http.StatusInternalServerError)
 					return
 				}
-				sse.ExecuteScript("alert('Game created successfully.');")
 			})
 
 			lobbyRouter.Delete("/{id}/delete", func(w http.ResponseWriter, r *http.Request) {
 				ctx := r.Context()
-				sse := datastar.NewSSE(w, r)
 
 				// Extract the "id" parameter from the URL
 				id := chi.URLParam(r, "id")
@@ -152,7 +148,6 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 					http.Error(w, fmt.Sprintf("failed to delete key '%s': %v", id, err), http.StatusInternalServerError)
 					return
 				}
-				sse.ExecuteScript("alert('Game deleted successfully.');")
 			})
 
 			lobbyRouter.Delete("/purge", func(w http.ResponseWriter, r *http.Request) {
