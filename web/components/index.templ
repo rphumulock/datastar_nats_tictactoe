@@ -59,7 +59,7 @@ templ GameListItem(mvc *GameState, sessionId string) {
 		selector := fmt.Sprintf("game-%s", mvc.Id)
 	}}
 	<div id={ selector } class="p-6 bg-base-300 border-4 border-accent-content rounded-none shadow-lg">
-		<h3 class="text-2xl font-extrabold tracking-widest text-accent-content mb-4">
+		<h3 class="text-lg font-extrabold tracking-widest text-accent-content mb-4">
 			{ id }
 		</h3>
 		if gameFull {

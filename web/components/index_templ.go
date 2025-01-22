@@ -176,7 +176,7 @@ func GameListItem(mvc *GameState, sessionId string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\" class=\"p-6 bg-base-300 border-4 border-accent-content rounded-none shadow-lg\"><h3 class=\"text-2xl font-extrabold tracking-widest text-accent-content mb-4\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\" class=\"p-6 bg-base-300 border-4 border-accent-content rounded-none shadow-lg\"><h3 class=\"text-lg font-extrabold tracking-widest text-accent-content mb-4\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

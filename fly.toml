@@ -1,4 +1,4 @@
-app = "datastar_nats_tictactoe"
+app = "datastar-nats-tictactoe"
 primary_region = "den"
 
 [env]
@@ -14,7 +14,7 @@ primary_region = "den"
 [[http_handlers]]
   action = "redirect"
   status_code = 301
-  url = "https://Natastar"
+  url = "https://datastar-nats-tictactoe.fly.dev"
 
 [[vm]]
   memory = "512mb"
