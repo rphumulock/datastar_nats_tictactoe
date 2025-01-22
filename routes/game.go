@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
+	"github.com/rphumulock/datastar_nats_tictactoe/web/pages"
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
@@ -23,74 +24,20 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 		return fmt.Errorf("failed to get games key-value store: %w", err)
 	}
 
-	// Define /game/{id} routes
-	router.Route("/game/{id}", func(gameRouter chi.Router) {
+	router.Get("/game/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		if id == "" {
+			respondError(w, http.StatusBadRequest, "missing 'id' parameter")
+			return
+		}
 
-		gameRouter.Get("/watch", func(w http.ResponseWriter, r *http.Request) {
-			id := chi.URLParam(r, "id")
-			if id == "" {
-				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
-				return
-			}
+		pages.Game(id).Render(r.Context(), w)
+	})
 
-			sessionId, err := getSessionID(store, r)
-			if err != nil || sessionId == "" {
-				respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
-				return
-			}
+	router.Route("/api/game/{id}", func(gameRouter chi.Router) {
 
+		gameRouter.Get("/init", func(w http.ResponseWriter, r *http.Request) {
 			sse := datastar.NewSSE(w, r)
-			watcher, err := gamesKV.WatchAll(r.Context())
-			if err != nil {
-				http.Error(w, fmt.Sprintf("Failed to start watcher: %v", err), http.StatusInternalServerError)
-				return
-			}
-			defer watcher.Stop()
-
-			// Process updates
-			for update := range watcher.Updates() {
-				if update == nil {
-					fmt.Println("End of historical updates. Now receiving live updates...")
-					continue
-				}
-
-				switch update.Operation() {
-				case jetstream.KeyValuePut:
-					mvc := &components.GameState{}
-					if err := json.Unmarshal(update.Value(), mvc); err != nil {
-						log.Printf("Error unmarshalling update: %v", err)
-						continue
-					}
-
-					log.Printf("Received update for game %v", mvc)
-
-					if mvc.Id != id {
-						continue
-					}
-
-					if mvc.Winner != "" {
-						c := components.GameWinner(mvc, sessionId)
-						if err := sse.MergeFragmentTempl(c,
-							datastar.WithSelectorID("game-container"),
-							datastar.WithMergeMorph(),
-						); err != nil {
-							sse.ConsoleError(err)
-						}
-					} else {
-						c := components.GameBoard(mvc, sessionId)
-						if err := sse.MergeFragmentTempl(c,
-							datastar.WithSelectorID("game-container"),
-							datastar.WithMergeMorph(),
-						); err != nil {
-							sse.ConsoleError(err)
-						}
-					}
-				case jetstream.KeyValueDelete:
-				}
-			}
-		})
-
-		gameRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
 			id := chi.URLParam(r, "id")
 			if id == "" {
 				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
@@ -121,20 +68,19 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 					return
 				}
 			}
-
-			components.GameMVCView(mvc, sessionId).Render(ctx, w)
-		})
-
-		gameRouter.Post("/toggle/{cell}", func(w http.ResponseWriter, r *http.Request) {
-			id := chi.URLParam(r, "id")
-			if id == "" {
-				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
+			c := components.Game(mvc, sessionId)
+			if err := sse.MergeFragmentTempl(c); err != nil {
+				sse.ConsoleError(err)
 				return
 			}
 
-			mvc, err := fetchGameState(ctx, gamesKV, id)
-			if err != nil {
-				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
+		})
+
+		gameRouter.Get("/watch", func(w http.ResponseWriter, r *http.Request) {
+			sse := datastar.NewSSE(w, r)
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
 				return
 			}
 
@@ -144,23 +90,93 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
+			watcher, err := gamesKV.Watch(ctx, id)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Failed to start watcher: %v", err), http.StatusInternalServerError)
+				return
+			}
+			defer watcher.Stop()
+
+			// Process updates
+			for update := range watcher.Updates() {
+				if update == nil {
+					fmt.Println("End of historical updates. Now receiving live updates...")
+					continue
+				}
+
+				switch update.Operation() {
+				case jetstream.KeyValuePut:
+					mvc := &components.GameState{}
+					if err := json.Unmarshal(update.Value(), mvc); err != nil {
+						log.Printf("Error unmarshalling update: %v", err)
+						continue
+					}
+
+					log.Printf("Received update for game %v", mvc)
+
+					if mvc.Id != id {
+						continue
+					}
+
+					c := components.GameBoard(mvc, sessionId)
+					if err := sse.MergeFragmentTempl(c,
+						datastar.WithSelectorID("game-container"),
+						datastar.WithMergeMorph(),
+					); err != nil {
+						sse.ConsoleError(err)
+					}
+
+				case jetstream.KeyValueDelete:
+					sse.Redirect("/")
+				}
+			}
+		})
+
+		gameRouter.Post("/toggle/{cell}", func(w http.ResponseWriter, r *http.Request) {
+			sse := datastar.NewSSE(w, r)
+
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				sse.ExecuteScript("alert('Missing game ID')")
+				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
+				return
+			}
+
+			mvc, err := fetchGameState(ctx, gamesKV, id)
+			if err != nil {
+				sse.ExecuteScript("alert('Error retrieving game state')")
+				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
+				return
+			}
+
+			sessionId, err := getSessionID(store, r)
+			if err != nil || sessionId == "" {
+				sse.ExecuteScript("alert('Error getting session ID')")
+				respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
+				return
+			}
+
 			cell := chi.URLParam(r, "cell")
 			i, err := strconv.Atoi(cell)
 			if err != nil || i < 0 || i >= len(mvc.Board) {
+				sse.ExecuteScript("alert('Invalid cell index')")
 				respondError(w, http.StatusBadRequest, "invalid cell index")
 				return
 			}
 
 			if mvc.Board[i] != "" {
+				sse.ExecuteScript("alert('Cell already occupied')")
 				respondError(w, http.StatusBadRequest, "cell already occupied")
 				return
 			}
 
 			if mvc.XIsNext && sessionId != mvc.Players[0] {
+				sse.ExecuteScript("alert('Not your turn')")
 				respondError(w, http.StatusForbidden, "not your turn")
 				return
 			}
 			if !mvc.XIsNext && sessionId != mvc.Players[1] {
+				sse.ExecuteScript("alert('Not your turn')")
 				respondError(w, http.StatusForbidden, "not your turn")
 				return
 			}
@@ -187,6 +203,30 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 			}
 
 			w.WriteHeader(http.StatusOK)
+		})
+
+		gameRouter.Post("/leave", func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			sse := datastar.NewSSE(w, r)
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
+				return
+			}
+
+			mvc, err := fetchGameState(ctx, gamesKV, id)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
+				return
+			}
+
+			mvc.Players[1] = ""
+			if err := updateGameState(ctx, gamesKV, mvc); err != nil {
+				respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
+				return
+			}
+
+			sse.Redirect("/")
 		})
 
 		gameRouter.Post("/reset", func(w http.ResponseWriter, r *http.Request) {

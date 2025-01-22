@@ -16,7 +16,7 @@ import (
 )
 
 func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (cleanup func() error, err error) {
-	natsPort := 33823
+	natsPort := 1234
 
 	log.Printf("Starting on Nats server %d", natsPort)
 	ns, err := embeddednats.New(ctx, embeddednats.WithNATSServerOptions(&server.Options{

@@ -5,7 +5,7 @@ import (
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-templ Index() {
+templ Game(id string) {
 	@layouts.Base() {
 		<div class="flex flex-col w-full min-h-screen bg-primary text-primary-content">
 			<nav class="w-full bg-secondary py-4 px-6 shadow-md">
@@ -15,7 +15,7 @@ templ Index() {
 					</span>
 				</div>
 			</nav>
-			<div id="main-container" class="flex flex-col items-center justify-center flex-grow gap-8" data-on-load={ datastar.GetSSE("/api/dashboard") }></div>
+			<div id="main-container" class="flex flex-col items-center justify-center flex-grow gap-8" data-on-load={ datastar.GetSSE("/api/game/%s/init", id) }></div>
 		</div>
 	}
 }

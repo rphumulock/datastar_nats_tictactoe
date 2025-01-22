@@ -18,8 +18,8 @@ import (
 )
 
 type User struct {
-	SessionID string `json:"session_id"` // Unique session ID for the user
-	GameID    string `json:"game_id"`    // List of games the user is in
+	SessionId string `json:"session_id"` // Unique session ID for the user
+	GameId    string `json:"game_id"`    // List of games the user is in
 }
 
 func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetStream) error {
@@ -34,54 +34,27 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 		return fmt.Errorf("failed to get games key value: %w", err)
 	}
 
-	// Save MVC state to the "game1" key in the "games" bucket
-	saveMVC := func(ctx context.Context, mvc *components.GameState) error {
-		b, err := json.Marshal(mvc)
-		if err != nil {
-			return fmt.Errorf("failed to marshal mvc: %w", err)
-		}
-		if _, err := gamesKV.Put(ctx, mvc.Id, b); err != nil {
-			return fmt.Errorf("failed to put key value: %w", err)
-		}
-		return nil
-	}
-
-	// Save MVC state to the "game1" key in the "games" bucket
 	saveUser := func(ctx context.Context, user *User) error {
 		b, err := json.Marshal(user)
 		if err != nil {
 			return fmt.Errorf("failed to marshal mvc: %w", err)
 		}
-		if _, err := usersKV.Put(ctx, user.SessionID, b); err != nil {
+		if _, err := usersKV.Put(ctx, user.SessionId, b); err != nil {
 			return fmt.Errorf("failed to put key value: %w", err)
 		}
 		return nil
 	}
 
-	// Handle session and save the default MVC state
-	mvcSession := func(w http.ResponseWriter, r *http.Request) (*components.GameState, error) {
-		ctx := r.Context()
-
-		mvc := &components.GameState{
-			Id: toolbelt.NextEncodedID(),
-		}
-		if err := saveMVC(ctx, mvc); err != nil {
-			return nil, fmt.Errorf("failed to save mvc: %w", err)
-		}
-		return mvc, nil
-	}
-
-	// Handle session and save the default MVC state
 	userSession := func(w http.ResponseWriter, r *http.Request) (*User, error) {
 		ctx := r.Context()
 
-		sessionID, err := createSessionID(store, r, w)
+		SessionId, err := createSessionID(store, r, w)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get session id: %w", err)
 		}
 
 		user := &User{
-			SessionID: sessionID,
+			SessionId: SessionId,
 		}
 		if err := saveUser(ctx, user); err != nil {
 			return nil, fmt.Errorf("failed to save mvc: %w", err)
@@ -90,59 +63,59 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 	}
 
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		sessionId, err := getSessionID(store, r)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if sessionId != "" {
-			pages.Dashboard(sessionId).Render(r.Context(), w)
-		} else {
-			pages.Login().Render(r.Context(), w)
-		}
+		pages.Index().Render(r.Context(), w)
 	})
 
-	router.Route("/api", func(apiRouter chi.Router) {
+	router.Route("/api/dashboard", func(dashboardRouter chi.Router) {
 
-		// Handle session and save the default state
-		apiRouter.Route("/login", func(loginRouter chi.Router) {
-			// Default game handler
-			loginRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				user, err := userSession(w, r)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				sse := datastar.NewSSE(w, r)
-				c := components.InitGame(user.SessionID)
+		dashboardRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			sse := datastar.NewSSE(w, r)
+			sessionId, err := getSessionID(store, r)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if sessionId == "" {
+				c := components.Login()
 				if err := sse.MergeFragmentTempl(c); err != nil {
 					sse.ConsoleError(err)
 					return
 				}
-			})
-		})
-
-		apiRouter.Route("/game", func(gameRouter chi.Router) {
-			// Default game handler
-			gameRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				_, err := mvcSession(w, r)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+			} else {
+				c := components.Dashboard(sessionId)
+				if err := sse.MergeFragmentTempl(c); err != nil {
+					sse.ConsoleError(err)
 					return
 				}
-			})
+			}
+		})
 
-			gameRouter.Post("/create", func(w http.ResponseWriter, r *http.Request) {
-				sessionId, err := getSessionID(store, r)
+		dashboardRouter.Get("/login", func(w http.ResponseWriter, r *http.Request) {
+			user, err := userSession(w, r)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			sse := datastar.NewSSE(w, r)
+			c := components.Dashboard(user.SessionId)
+			if err := sse.MergeFragmentTempl(c); err != nil {
+				sse.ConsoleError(err)
+				return
+			}
+		})
+
+		dashboardRouter.Route("/lobby", func(lobbyRouter chi.Router) {
+
+			lobbyRouter.Post("/create", func(w http.ResponseWriter, r *http.Request) {
+				SessionId, err := getSessionID(store, r)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
 
 				gameState := components.GameState{
-					Id:      sessionId,
-					Players: [2]string{sessionId, ""},
+					Id:      SessionId,
+					Players: [2]string{SessionId, ""},
 					Board:   [9]string{"", "", "", "", "", "", "", "", ""},
 					XIsNext: true,
 					Winner:  "",
@@ -152,14 +125,14 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 					http.Error(w, fmt.Sprintf("failed to marshal mvc: %v", err), http.StatusInternalServerError)
 					return
 				}
-				_, err = gamesKV.Put(r.Context(), sessionId, bytes)
+				_, err = gamesKV.Put(r.Context(), SessionId, bytes)
 				if err != nil {
 					http.Error(w, fmt.Sprintf("failed to put key value: %v", err), http.StatusInternalServerError)
 					return
 				}
 			})
 
-			gameRouter.Delete("/{id}/delete", func(w http.ResponseWriter, r *http.Request) {
+			lobbyRouter.Delete("/{id}/delete", func(w http.ResponseWriter, r *http.Request) {
 				ctx := r.Context()
 
 				// Extract the "id" parameter from the URL
@@ -177,17 +150,21 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 				}
 			})
 
-			gameRouter.Delete("/deleteAllGames", func(w http.ResponseWriter, r *http.Request) {
+			lobbyRouter.Delete("/purge", func(w http.ResponseWriter, r *http.Request) {
 				ctx := r.Context()
+				sse := datastar.NewSSE(w, r)
 
-				// List all keys in the bucket
+				// List all keys in the "games" bucket
 				keys, err := gamesKV.Keys(ctx)
 				if err != nil {
-					log.Fatalf("Error listing keys: %v", err)
+					http.Error(w, fmt.Sprintf("Error listing keys: %v", err), http.StatusInternalServerError)
+					log.Printf("Error listing keys: %v", err)
+					return
 				}
 
 				if len(keys) == 0 {
-					fmt.Println("No keys found in the bucket.")
+					log.Println("No keys found in the bucket.")
+					fmt.Fprintln(w, "No games to purge.")
 					return
 				}
 
@@ -196,16 +173,24 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 					err := gamesKV.Delete(ctx, key)
 					if err != nil {
 						log.Printf("Error deleting key '%s': %v", key, err)
-					} else {
-						fmt.Printf("Deleted key: %s\n", key)
+						continue
+					}
+
+					log.Printf("Deleted key: %s", key)
+
+					if err := sse.RemoveFragments("#game-"+key,
+						datastar.WithRemoveSettleDuration(1*time.Millisecond),
+						datastar.WithRemoveUseViewTransitions(true),
+					); err != nil {
+						sse.ConsoleError(err)
 					}
 				}
-			})
-		})
 
-		// Watch for updates to the "games" bucket
-		apiRouter.Route("/games", func(gameRouter chi.Router) {
-			gameRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
+				// Respond with a success message
+				fmt.Fprintln(w, "All games have been purged.")
+			})
+
+			lobbyRouter.Get("/watch", func(w http.ResponseWriter, r *http.Request) {
 				sse := datastar.NewSSE(w, r)
 
 				sessionId, err := getSessionID(store, r)
@@ -246,7 +231,9 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 					}
 				}
 			})
+
 		})
+
 	})
 
 	return nil
@@ -264,7 +251,7 @@ func processPutOperation(update jetstream.KeyValueEntry, historicalMode bool, se
 // Helper function to process KeyValueDelete operation
 func processDeleteOperation(update jetstream.KeyValueEntry, historicalMode bool, sse datastar.ServerSentEventGenerator) {
 	if historicalMode {
-		fmt.Printf("Ignoring historical delete for key: %s\n", update.Key())
+		log.Printf("Ignoring historical delete for key: %s", update.Key())
 		return
 	}
 
@@ -278,61 +265,52 @@ func processDeleteOperation(update jetstream.KeyValueEntry, historicalMode bool,
 
 // Handle historical KeyValuePut updates
 func handleHistoricalPut(update jetstream.KeyValueEntry, sessionId string, sse datastar.ServerSentEventGenerator) {
-	if update.Key() == sessionId {
-		handleSessionUpdate(update, sessionId, sse)
-	} else {
-		handleNonSessionUpdate(update, sessionId, sse)
-	}
+	handleSessionUpdate(update, sessionId, sse)
 }
 
 // Handle live KeyValuePut updates
 func handleLivePut(update jetstream.KeyValueEntry, sessionId string, sse datastar.ServerSentEventGenerator) {
-	if update.Key() == sessionId {
-		sse.ExecuteScript("window.location.assign('/game/" + sessionId + "')")
-	} else {
-		handleNonSessionUpdate(update, sessionId, sse)
-	}
+	handleSessionUpdate(update, sessionId, sse)
 }
 
 // Handle updates for the session ID
 func handleSessionUpdate(update jetstream.KeyValueEntry, sessionId string, sse datastar.ServerSentEventGenerator) {
-	sse.RemoveFragments("#game-"+update.Key(),
+	// Remove outdated fragments
+	if err := sse.RemoveFragments("#game-"+update.Key(),
 		datastar.WithRemoveSettleDuration(1*time.Millisecond),
-	)
+	); err != nil {
+		log.Printf("Error removing fragments: %v", err)
+		return
+	}
 
-	mvc := &components.GameState{}
-	if err := json.Unmarshal(update.Value(), mvc); err != nil {
+	// Parse the update into a GameState object
+	var mvc components.GameState
+	if err := json.Unmarshal(update.Value(), &mvc); err != nil {
 		log.Printf("Error unmarshalling update value: %v", err)
 		return
 	}
 
-	c := components.HostedGame(mvc, sessionId)
-	if err := sse.MergeFragmentTempl(c,
-		datastar.WithSelectorID("games-list-container"),
-		datastar.WithMergeAppend(),
-	); err != nil {
-		sse.ConsoleError(err)
-	}
-}
+	if mvc.Id != sessionId {
+		if mvc.Players[1] == "" {
 
-// Handle updates for keys other than the session ID
-func handleNonSessionUpdate(update jetstream.KeyValueEntry, sessionId string, sse datastar.ServerSentEventGenerator) {
-	sse.RemoveFragments("#game-"+update.Key(),
-		datastar.WithRemoveSettleDuration(1*time.Millisecond),
-	)
-
-	mvc := &components.GameState{}
-	if err := json.Unmarshal(update.Value(), mvc); err != nil {
-		log.Printf("Error unmarshalling update value: %v", err)
-		return
-	}
-
-	c := components.JoinGame(mvc, sessionId)
-	if err := sse.MergeFragmentTempl(c,
-		datastar.WithSelectorID("games-list-container"),
-		datastar.WithMergeAppend(),
-	); err != nil {
-		sse.ConsoleError(err)
+			// Create a new game list item and merge it into the DOM
+			c := components.GameListItem(&mvc, sessionId)
+			if err := sse.MergeFragmentTempl(c,
+				datastar.WithSelectorID("games-list-container"),
+				datastar.WithMergeAppend(),
+			); err != nil {
+				sse.ConsoleError(err)
+			}
+		}
+	} else {
+		// Create a new game list item and merge it into the DOM
+		c := components.GameListItem(&mvc, sessionId)
+		if err := sse.MergeFragmentTempl(c,
+			datastar.WithSelectorID("games-list-container"),
+			datastar.WithMergeAppend(),
+		); err != nil {
+			sse.ConsoleError(err)
+		}
 	}
 }
 
