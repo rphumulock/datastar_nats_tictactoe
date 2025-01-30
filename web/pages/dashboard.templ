@@ -1,0 +1,53 @@
+package pages
+
+import (
+	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
+	datastar "github.com/starfederation/datastar/sdk/go"
+)
+
+templ Dashboard(session string) {
+	@layouts.Base() {
+		<div class="min-h-screen bg-base text-primary-content flex flex-col">
+			<!-- Navigation Bar -->
+			<nav class="bg-secondary text-secondary-content py-4 shadow-lg">
+				<div class="container mx-auto flex items-center justify-between px-6">
+					<!-- App Title -->
+					<span class="text-xl text-primary-content font-bold tracking-wide uppercase">
+						Tic Tac Toe
+					</span>
+					<!-- Welcome Message (Centered) -->
+					<h1 class="flex-1 text-center text-xl font-semibold text-accent">
+						Welcome,
+					</h1>
+					<!-- Action Buttons -->
+					<div class="flex gap-3">
+						<a class="btn btn-accent" href="/logout">
+							Logout
+						</a>
+						<button
+							class="btn btn-primary"
+							data-on-click={ datastar.PostSSE("/api/dashboard/lobby/create") }
+						>
+							Create Game
+						</button>
+						<button
+							class="btn btn-warning"
+							data-on-click={ datastar.DeleteSSE("/api/dashboard/lobby/purge") }
+						>
+							Delete All Games
+						</button>
+					</div>
+				</div>
+			</nav>
+			<!-- Main Content -->
+			<main class="flex flex-col items-center justify-center flex-grow py-6">
+				<section class="w-4/5 max-w-3xl bg-base-500 border border-accent shadow-lg p-6 h-[40rem] overflow-y-auto rounded-lg">
+					<h2 class="text-lg font-bold text-accent mb-4 tracking-wide">
+						Active Games
+					</h2>
+					<div id="games-list-container" data-on-load={ datastar.GetSSE("/api/dashboard/lobby/watch") }></div>
+				</section>
+			</main>
+		</div>
+	}
+}

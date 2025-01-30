@@ -8,10 +8,7 @@ package pages
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import (
-	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
-	datastar "github.com/starfederation/datastar/sdk/go"
-)
+import "github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
 
 func Index() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -46,20 +43,7 @@ func Index() templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"flex flex-col w-full min-h-screen bg-primary text-primary-content\"><nav class=\"w-full bg-secondary py-4 px-6 shadow-md\"><div class=\"container mx-auto flex items-center justify-between\"><span class=\"text-2xl font-extrabold tracking-widest uppercase text-secondary-content\">Tic Tac Toe</span></div></nav><div id=\"main-container\" class=\"flex flex-col items-center justify-center flex-grow gap-8\" data-on-load=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var3 string
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.GetSSE("/api/dashboard"))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/pages/index.templ`, Line: 18, Col: 142}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\"></div></div>")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"flex flex-col w-full min-h-screen bg-primary text-primary-content\"><nav class=\"w-full bg-secondary py-4 px-6 shadow-md\"><div class=\"container mx-auto flex items-center justify-between\"><span class=\"text-2xl font-extrabold tracking-widest uppercase text-secondary-content\">Tic Tac Toe</span></div></nav><div id=\"main-container\" class=\"flex flex-col items-center justify-center flex-grow gap-8\"><h1 class=\"text-4xl font-extrabold text-accent-content tracking-widest text-center\">Ready to Play?</h1><a class=\"bg-accent hover:bg-accent-focus text-accent-content font-bold text-xl py-4 px-8 border-4 border-secondary rounded-none shadow-lg\" href=\"/api/index/login\">Login</a></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

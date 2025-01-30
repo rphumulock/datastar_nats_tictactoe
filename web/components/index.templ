@@ -7,50 +7,6 @@ import (
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-templ Login() {
-	<div id="main-container" class="flex flex-col items-center justify-center flex-grow gap-8">
-		<h1 class="text-4xl font-extrabold text-accent-content tracking-widest text-center">
-			Ready to Play?
-		</h1>
-		<button
-			class="bg-accent hover:bg-accent-focus text-accent-content font-bold text-xl py-4 px-8 border-4 border-secondary rounded-none shadow-lg"
-			data-on-click={ datastar.GetSSE("/api/dashboard/login") }
-		>
-			Login
-		</button>
-	</div>
-}
-
-templ Dashboard(sessionId string) {
-	<div id="main-container" class="flex flex-col items-center justify-center gap-8">
-		<div class="text-center text-3xl font-extrabold text-accent-content tracking-widest">
-			Welcome, { sessionId }
-		</div>
-		<button
-			class="bg-accent hover:bg-accent-focus text-accent-content font-bold text-xl py-3 px-8 border-4 border-secondary rounded-none shadow-md"
-			data-on-click={ datastar.PostSSE("/api/dashboard/lobby/create") }
-		>
-			Create Game
-		</button>
-		<section class="w-5/6 lg:w-3/4 xl:w-2/3 m-8 p-8 bg-base-300 border-4 border-accent-content shadow-lg rounded-none h-[48rem] overflow-y-scroll">
-			<h2 class="text-3xl font-extrabold text-secondary-content tracking-widest mb-6">
-				Active Games
-			</h2>
-			<div
-				id="games-list-container"
-				class="space-y-6"
-				data-on-load={ datastar.GetSSE("/api/dashboard/lobby/watch") }
-			></div>
-		</section>
-		<button
-			class="bg-accent hover:bg-accent-focus text-accent-content font-bold text-lg py-2 px-6 border-4 border-secondary rounded-none shadow-md"
-			data-on-click={ datastar.DeleteSSE("/api/dashboard/lobby/purge") }
-		>
-			Delete All Games
-		</button>
-	</div>
-}
-
 templ GameListItem(mvc *GameState, sessionId string) {
 	{{
 		isHost := mvc.Players[0] == sessionId

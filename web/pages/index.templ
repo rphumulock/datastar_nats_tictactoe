@@ -1,9 +1,6 @@
 package pages
 
-import (
-	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
-	datastar "github.com/starfederation/datastar/sdk/go"
-)
+import "github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
 
 templ Index() {
 	@layouts.Base() {
@@ -15,7 +12,17 @@ templ Index() {
 					</span>
 				</div>
 			</nav>
-			<div id="main-container" class="flex flex-col items-center justify-center flex-grow gap-8" data-on-load={ datastar.GetSSE("/api/dashboard") }></div>
+			<div id="main-container" class="flex flex-col items-center justify-center flex-grow gap-8">
+				<h1 class="text-4xl font-extrabold text-accent-content tracking-widest text-center">
+					Ready to Play?
+				</h1>
+				<a
+					class="bg-accent hover:bg-accent-focus text-accent-content font-bold text-xl py-4 px-8 border-4 border-secondary rounded-none shadow-lg"
+					href="/api/index/login"
+				>
+					Login
+				</a>
+			</div>
 		</div>
 	}
 }

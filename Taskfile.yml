@@ -13,7 +13,7 @@ tasks:
 
   build:styles:
     cmds:
-      - pnpx tailwindcss -c tailwind.config.js -i web/styles/styles.css -o $STATIC_DIR/index.css
+      - pnpm exec tailwindcss -c tailwind.config.js -i web/styles/styles.css -o $STATIC_DIR/index.css
 
   build:
     cmds:
@@ -40,7 +40,7 @@ tasks:
 
   live:styles:
     cmds:
-      - pnpx tailwindcss -c tailwind.config.js -i web/styles/styles.css -o $STATIC_DIR/index.css --watch
+      - pnpm exec tailwindcss -c tailwind.config.js -i web/styles/styles.css -o $STATIC_DIR/index.css --watch
 
   live:server:
     cmds:
