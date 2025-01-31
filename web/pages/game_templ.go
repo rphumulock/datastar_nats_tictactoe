@@ -46,7 +46,7 @@ func Game(id string) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"flex flex-col w-full min-h-screen bg-primary text-primary-content\"><nav class=\"w-full bg-secondary py-4 px-6 shadow-md\"><div class=\"container mx-auto flex items-center justify-between\"><span class=\"text-2xl font-extrabold tracking-widest uppercase text-secondary-content\">Tic Tac Toe</span></div></nav><div id=\"main-container\" class=\"flex flex-col items-center justify-center flex-grow gap-8\" data-on-load=\"")
+			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 1)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -59,7 +59,7 @@ func Game(id string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\"></div></div>")
+			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 2)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

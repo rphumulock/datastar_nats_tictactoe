@@ -12,22 +12,16 @@ templ Index() {
 			<nav class="bg-secondary text-secondary-content py-4 shadow-md">
 				<div class="container mx-auto flex items-center justify-center">
 					<span class="text-2xl font-bold uppercase tracking-widest">
-						Tic Tac Toes
+						Tic Tac Toe
 					</span>
 				</div>
 			</nav>
 			<!-- Main Content -->
-			<main class="flex flex-col items-center justify-center flex-grow gap-6">
+			<main id="main" class="flex flex-col items-center justify-center flex-grow gap-6">
 				<h1 class="text-4xl font-bold text-accent tracking-wide text-center">
 					Ready to Play?
 				</h1>
-				@components.UserNameComponent()
-				<a
-					class="btn btn-primary"
-					href="/api/index/login"
-				>
-					Login
-				</a>
+				@components.InlineValidationUser()
 			</main>
 		</div>
 	}

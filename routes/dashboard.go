@@ -37,9 +37,10 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 		pages.Dashboard("wd").Render(r.Context(), w)
 	})
 
-	router.Get("/logout", func(w http.ResponseWriter, r *http.Request) {
+	router.Post("/logout", func(w http.ResponseWriter, r *http.Request) {
 		handleLogout(store, w, r)
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		sse := datastar.NewSSE(w, r)
+		sse.Redirect("/")
 	})
 
 	router.Route("/api/dashboard", func(dashboardRouter chi.Router) {
@@ -278,14 +279,15 @@ func handleSessionUpdate(update jetstream.KeyValueEntry, sessionId string, sse d
 
 // Check if a user session exists
 func handleLogout(store sessions.Store, w http.ResponseWriter, r *http.Request) {
-	sess, err := store.Get(r, "connections")
+	session, err := store.Get(r, "connections")
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to get session: %v", err), http.StatusInternalServerError)
 		return
 	}
-	delete(sess.Values, "id")
-	if err := sess.Save(r, w); err != nil {
+	delete(session.Values, "id")
+	if err := session.Save(r, w); err != nil {
 		http.Error(w, fmt.Sprintf("failed to save session: %v", err), http.StatusInternalServerError)
 		return
 	}
+
 }

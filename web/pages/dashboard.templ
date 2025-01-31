@@ -21,9 +21,12 @@ templ Dashboard(session string) {
 					</h1>
 					<!-- Action Buttons -->
 					<div class="flex gap-3">
-						<a class="btn btn-accent" href="/logout">
+						<button
+							class="btn btn-primary"
+							data-on-click={ datastar.PostSSE("/logout") }
+						>
 							Logout
-						</a>
+						</button>
 						<button
 							class="btn btn-primary"
 							data-on-click={ datastar.PostSSE("/api/dashboard/lobby/create") }

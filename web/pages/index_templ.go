@@ -46,15 +46,15 @@ func Index() templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"min-h-screen flex flex-col bg-base-200 text-primary-content\"><!-- Navigation Bar --><nav class=\"bg-secondary text-secondary-content py-4 shadow-md\"><div class=\"container mx-auto flex items-center justify-center\"><span class=\"text-2xl font-bold uppercase tracking-widest\">Tic Tac Toes</span></div></nav><!-- Main Content --><main class=\"flex flex-col items-center justify-center flex-grow gap-6\"><h1 class=\"text-4xl font-bold text-accent tracking-wide text-center\">Ready to Play?</h1>")
+			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 1)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = components.UserNameComponent().Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = components.InlineValidationUserComponent().Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<a class=\"btn btn-primary\" href=\"/api/index/login\">Login</a></main></div>")
+			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 2)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

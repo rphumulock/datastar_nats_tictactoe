@@ -4,50 +4,67 @@ env:
   STATIC_DIR: "web/static"
 
 tasks:
-  # The `build:` tasks below are used together for "production" builds of your project
+  # -------------------------------
+  # Build Tasks (For Production)
+  # -------------------------------
+
   build:templ:
+    desc: "Generate Go templates using templ"
     env:
       TEMPL_EXPERIMENT: rawgo
     cmds:
       - go run github.com/a-h/templ/cmd/templ@v0.2.793 generate -v
 
   build:styles:
+    desc: "Compile TailwindCSS styles"
     cmds:
       - pnpm exec tailwindcss -c tailwind.config.js -i web/styles/styles.css -o $STATIC_DIR/index.css
 
   build:
+    desc: "Compile the Go project and generate necessary assets"
     cmds:
-      - go build -o bin/main .
+      - mkdir -p tmp # ✅ Ensure tmp/ directory exists
+      - go build -o tmp/main . # ✅ Build to tmp/main
     deps:
       - build:styles
       - build:templ
-      - build:esbuild
     parallel: true
 
-  # Use this task to debug your project with the delve debugger
+  # -------------------------------
+  # Debugging Tasks
+  # -------------------------------
+
   debug:
+    desc: "Run project with Delve debugger"
     cmds:
-      - go run github.com/go-delve/delve/cmd/dlv@v1.23.1 exec ./bin/main
+      - go run github.com/go-delve/delve/cmd/dlv@v1.23.1 exec ./tmp/main
     deps:
       - build
 
-  # The `live:` tasks below are used together for "dev" builds, and will hot-reload your entire project when there are code changes
+  # -------------------------------
+  # Live Reload (For Development)
+  # -------------------------------
+
   live:templ:
+    desc: "Watch for templ changes and regenerate templates"
     env:
       TEMPL_EXPERIMENT: rawgo
     cmds:
       - go run github.com/a-h/templ/cmd/templ@v0.2.793 generate --watch --proxy="http://localhost:8080" --open-browser=false -v
 
   live:styles:
+    desc: "Watch and recompile TailwindCSS styles"
     cmds:
       - pnpm exec tailwindcss -c tailwind.config.js -i web/styles/styles.css -o $STATIC_DIR/index.css --watch
 
   live:server:
+    desc: "Auto-reload the Go server with Air"
     cmds:
+      - mkdir -p tmp # ✅ Ensure tmp/ directory exists
       - |
         go run github.com/air-verse/air@v1.52.3 \
-        --build.cmd "go build -tags dev -o tmp/bin/main" \
-        --build.bin "tmp/bin/main" \
+        --build.cmd "go build -tags dev -o tmp/main" \  # ✅ Build correctly
+        --build.bin "tmp/main" \
         --build.delay "20" \
         --build.exclude_dir "node_modules,data,public" \
         --build.include_ext "go" \
@@ -55,6 +72,7 @@ tasks:
         --misc.clean_on_exit true
 
   live:reload:
+    desc: "Watch for changes in static files and trigger a reload"
     cmds:
       - |
         go run github.com/air-verse/air@v1.52.3 \
@@ -66,18 +84,25 @@ tasks:
         --build.include_ext "css"
 
   live:
+    desc: "Run the full live-reloading development environment"
     deps:
       - live:templ
       - live:styles
       - live:reload
       - live:server
 
+  # -------------------------------
+  # Running the Application
+  # -------------------------------
+
   run:
+    desc: "Run the compiled Go binary"
     cmds:
-      - ./bin/main
+      - ./tmp/main # ✅ Uses correct binary path
     deps:
       - build
 
   default:
+    desc: "Default task: runs the application"
     deps:
       - run

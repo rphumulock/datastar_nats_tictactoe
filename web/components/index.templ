@@ -1,5 +1,3 @@
-
-
 package components 
 
 import (
@@ -7,7 +5,7 @@ import (
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-type inlineValidationUser struct {
+type InlineValidationUser struct {
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
 	Email     string `json:"email"`
@@ -19,34 +17,26 @@ templ inlineValidationFieldComponent(label, field string, isValid bool, isNotVal
 			<span class="label-text">{ label }</span>
 		</label>
 		<input
-			class={ "input input-bordered", templ.KV("input-error",!isValid) }
+			class={ "input input-bordered", templ.KV("input-error", !isValid) }
 			data-bind={ field }
 			data-on-keydown__debounce.500ms={ datastar.GetSSE("/examples/inline_validation/data") }
-			data-testid={ "input_" + field }
 		/>
 		if !isValid {
-			<label class="text-sm font-bold text-error" data-testid={ "validation_" + field }>{ fmt.Sprintf( isNotValidErrorLabelFmt, labelArgs...) }</label>
+			<label class="text-sm font-bold text-error">{ fmt.Sprintf( isNotValidErrorLabelFmt, labelArgs...) }</label>
 		}
 	</div>
 }
 
-templ inlineValidationUserComponent(u *inlineValidationUser, isNameValid, isValid bool) {
+templ inlineValidationUserComponent(u *InlineValidationUser, isNameValid, isValid bool) {
 	<div
-		id="inline_validation"
 		class="flex flex-col gap-4"
-		data-signals__ifmissing={ templ.JSONString(u) }
+		data-signals={ "{disabled:'true'}" }
 	>
 		<div>
 			@inlineValidationFieldComponent("Name", "name", isNameValid, "Name must be at least 2 characters.")
 		</div>
-		<button
-			class="btn btn-success"
-			disabled?={ !isValid }
-			data-on-click={ datastar.PostSSE("/examples/inline_validation/data") }
-		>
-			@icon("material-symbols:person-add")
-			Add User
+		<button class="btn btn-primary w-full" data-on-click={ datastar.PostSSE("api/index/login") }>
+			Login
 		</button>
-		<div class="divider"></div>
 	</div>
 }

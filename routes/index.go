@@ -6,11 +6,15 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/a-h/templ"
 	"github.com/delaneyj/toolbelt"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
 	"github.com/rphumulock/datastar_nats_tictactoe/web/pages"
+
+	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
 type User struct {
@@ -69,13 +73,54 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 
 	router.Route("/api/index", func(indexRouter chi.Router) {
 
-		indexRouter.Get("/login", func(w http.ResponseWriter, r *http.Request) {
-			_, err := userSession(w, r)
-			if err != nil {
+		indexRouter.Route("/inline_validation/data", func(dataRouter chi.Router) {
+			userValidation := func(u *components.InlineValidationUser) (isEmailValid bool, isFirstNameValid bool, isLastNameValid bool, isValid bool) {
+				isEmailValid = u.Email == "test@test.com"
+				isFirstNameValid = len(u.FirstName) >= 2
+				isLastNameValid = len(u.LastName) >= 2
+				isValid = isFirstNameValid && isLastNameValid && isEmailValid
+				return isEmailValid, isFirstNameValid, isLastNameValid, isValid
+			}
+
+			dataRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
+				u := &components.InlineValidationUser{}
+				if err := datastar.ReadSignals(r, u); err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
+				}
+				sse := datastar.NewSSE(w, r)
+				isEmailValid, isFirstNameValid, isLastNameValid, isValid := userValidation(u)
+				sse.MergeFragmentTempl(components.InlineValidationUserComponent(u, isEmailValid, isFirstNameValid, isLastNameValid, isValid))
+			})
+
+			dataRouter.Post("/", func(w http.ResponseWriter, r *http.Request) {
+				u := &components.InlineValidationUser{}
+				if err := datastar.ReadSignals(r, u); err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
+				}
+
+				isEmailValid, isFirstNameValid, isLastNameValid, isValid := userValidation(u)
+
+				sse := datastar.NewSSE(w, r)
+				var node templ.Component
+				if !isValid {
+					node = components.InlineValidationUserComponent(u, isEmailValid, isFirstNameValid, isLastNameValid, isValid)
+				} else {
+					node = components.InlineValidationUserComponent()
+				}
+
+				sse.MergeFragmentTempl(node)
+			})
+		})
+
+		indexRouter.Post("/login", func(w http.ResponseWriter, r *http.Request) {
+			if _, err := userSession(w, r); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+			sse := datastar.NewSSE(w, r)
+			sse.Redirect("/dashboard")
 		})
 
 	})
