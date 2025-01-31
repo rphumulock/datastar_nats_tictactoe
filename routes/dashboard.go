@@ -34,7 +34,7 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
-		pages.Dashboard().Render(r.Context(), w)
+		pages.Dashboard("wd").Render(r.Context(), w)
 	})
 
 	router.Get("/logout", func(w http.ResponseWriter, r *http.Request) {
