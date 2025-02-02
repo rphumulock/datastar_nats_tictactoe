@@ -7,15 +7,17 @@ import (
 
 templ Game(id string) {
 	@layouts.Base() {
-		<div class="flex flex-col w-full min-h-screen bg-primary text-primary-content">
-			<nav class="w-full bg-secondary py-4 px-6 shadow-md">
-				<div class="container mx-auto flex items-center justify-between">
-					<span class="text-2xl font-extrabold tracking-widest uppercase text-secondary-content">
+		<div class="flex flex-col min-h-screen max-h-screen overflow-hidden" data-on-load={ datastar.GetSSE("/api/game/%s/watch", id) }>
+			<!-- Navigation Bar -->
+			<nav class="bg-base-300 text-base-content py-4 shadow-lg">
+				<div class="container mx-auto flex items-center justify-between px-6">
+					<!-- Left: Game Title -->
+					<div class="text-2xl font-extrabold tracking-widest uppercase text-secondary-content">
 						Tic Tac Toe
-					</span>
+					</div>
 				</div>
 			</nav>
-			<div id="main-container" class="flex flex-col items-center justify-center flex-grow gap-8" data-on-load={ datastar.GetSSE("/api/game/%s/init", id) }></div>
+			<main id="main-container" class="flex flex-col flex-grow w-full p-4 overflow-hidden" data-on-load={ datastar.GetSSE("/api/game/%s/", id) }></main>
 		</div>
 	}
 }

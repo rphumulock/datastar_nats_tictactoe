@@ -1,27 +1,26 @@
 package pages
 
 import (
-	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
 	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
+	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
 templ Index() {
 	@layouts.Base() {
-		<div class="min-h-screen flex flex-col bg-base-200 text-primary-content">
+		<!-- Full-Screen Container -->
+		<div class="flex flex-col min-h-screen max-h-screen overflow-hidden">
 			<!-- Navigation Bar -->
-			<nav class="bg-secondary text-secondary-content py-4 shadow-md">
-				<div class="container mx-auto flex items-center justify-center">
-					<span class="text-2xl font-bold uppercase tracking-widest">
+			<nav class="bg-base-300 text-base-content py-4 shadow-lg">
+				<div class="container mx-auto flex items-center justify-between px-6">
+					<!-- Left: Game Title -->
+					<div class="text-2xl font-extrabold tracking-widest uppercase text-secondary-content">
 						Tic Tac Toe
-					</span>
+					</div>
 				</div>
 			</nav>
 			<!-- Main Content -->
-			<main id="main" class="flex flex-col items-center justify-center flex-grow gap-6">
-				<h1 class="text-4xl font-bold text-accent tracking-wide text-center">
-					Ready to Play?
-				</h1>
-				@components.InlineValidationUser()
+			<main class="min-h-screen flex flex-col items-center justify-center flex-grow gap-6">
+				<div id="login" data-on-load={ datastar.GetSSE("/api/index") }></div>
 			</main>
 		</div>
 	}

@@ -5,21 +5,15 @@ import (
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-type InlineValidationUser struct {
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-	Email     string `json:"email"`
-}
-
 templ inlineValidationFieldComponent(label, field string, isValid bool, isNotValidErrorLabelFmt string, labelArgs ...any) {
 	<div class="form-control">
 		<label class="label">
 			<span class="label-text">{ label }</span>
 		</label>
 		<input
-			class={ "input input-bordered", templ.KV("input-error", !isValid) }
+			class={ "input input-bordered text-accent", templ.KV("input-error", !isValid) }
 			data-bind={ field }
-			data-on-keydown__debounce.500ms={ datastar.GetSSE("/examples/inline_validation/data") }
+			data-on-keydown__debounce.500ms={ datastar.GetSSE("/api/index") }
 		/>
 		if !isValid {
 			<label class="text-sm font-bold text-error">{ fmt.Sprintf( isNotValidErrorLabelFmt, labelArgs...) }</label>
@@ -27,16 +21,22 @@ templ inlineValidationFieldComponent(label, field string, isValid bool, isNotVal
 	</div>
 }
 
-templ inlineValidationUserComponent(u *InlineValidationUser, isNameValid, isValid bool) {
-	<div
-		class="flex flex-col gap-4"
-		data-signals={ "{disabled:'true'}" }
-	>
-		<div>
-			@inlineValidationFieldComponent("Name", "name", isNameValid, "Name must be at least 2 characters.")
+templ InlineValidationUserComponent(u *InlineValidationUser, isNameValid bool) {
+	<div id="login" data-signals__ifmissing={ templ.JSONString(u) }>
+		<h1 class="text-4xl font-bold text-accent tracking-wide text-center">
+			Ready to Play?
+		</h1>
+		<div class="flex flex-col gap-4">
+			<div>
+				@inlineValidationFieldComponent("Enter Your Name:", "name", isNameValid, "Name must be at least 2 characters.")
+			</div>
+			<button
+				disabled?={ !isNameValid }
+				class="btn btn-secondary w-full"
+				data-on-click={ datastar.PostSSE("api/index/login") }
+			>
+				Login
+			</button>
 		</div>
-		<button class="btn btn-primary w-full" data-on-click={ datastar.PostSSE("api/index/login") }>
-			Login
-		</button>
 	</div>
 }

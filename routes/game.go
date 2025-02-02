@@ -36,7 +36,7 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 
 	router.Route("/api/game/{id}", func(gameRouter chi.Router) {
 
-		gameRouter.Get("/init", func(w http.ResponseWriter, r *http.Request) {
+		gameRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
 			sse := datastar.NewSSE(w, r)
 			id := chi.URLParam(r, "id")
 			if id == "" {
@@ -44,31 +44,31 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			mvc, err := fetchGameState(ctx, gamesKV, id)
+			gameState, err := fetchGameState(ctx, gamesKV, id)
 			if err != nil {
 				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
 				return
 			}
 
-			sessionId, err := getSessionID(store, r)
+			sessionId, err := getSessionId(store, r)
 			if err != nil || sessionId == "" {
 				respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
 				return
 			}
 
-			if gameIsFull(mvc) && !containsPlayer(mvc.Players[:], sessionId) {
+			if gameIsFull(gameState) && !containsPlayer(gameState, sessionId) {
 				respondError(w, http.StatusForbidden, "game is full")
 				return
 			}
 
-			if !containsPlayer(mvc.Players[:], sessionId) {
-				addPlayer(mvc, sessionId)
-				if err := updateGameState(ctx, gamesKV, mvc); err != nil {
+			if !containsPlayer(gameState, sessionId) {
+				gameState.ChallengerId = sessionId
+				if err := updateGameState(ctx, gamesKV, gameState); err != nil {
 					respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
 					return
 				}
 			}
-			c := components.Game(mvc, sessionId)
+			c := components.Game(gameState, sessionId)
 			if err := sse.MergeFragmentTempl(c); err != nil {
 				sse.ConsoleError(err)
 				return
@@ -84,7 +84,7 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			sessionId, err := getSessionID(store, r)
+			sessionId, err := getSessionId(store, r)
 			if err != nil || sessionId == "" {
 				respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
 				return
@@ -149,7 +149,7 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			sessionId, err := getSessionID(store, r)
+			sessionId, err := getSessionId(store, r)
 			if err != nil || sessionId == "" {
 				sse.ExecuteScript("alert('Error getting session ID')")
 				respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
@@ -170,12 +170,12 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			if mvc.XIsNext && sessionId != mvc.Players[0] {
+			if mvc.XIsNext && sessionId != mvc.HostId {
 				sse.ExecuteScript("alert('Not your turn')")
 				respondError(w, http.StatusForbidden, "not your turn")
 				return
 			}
-			if !mvc.XIsNext && sessionId != mvc.Players[1] {
+			if !mvc.XIsNext && sessionId != mvc.ChallengerId {
 				sse.ExecuteScript("alert('Not your turn')")
 				respondError(w, http.StatusForbidden, "not your turn")
 				return
@@ -220,7 +220,7 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			mvc.Players[1] = ""
+			mvc.ChallengerId = ""
 			if err := updateGameState(ctx, gamesKV, mvc); err != nil {
 				respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
 				return
@@ -242,13 +242,13 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			sessionId, err := getSessionID(store, r)
+			sessionId, err := getSessionId(store, r)
 			if err != nil || sessionId == "" {
 				respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
 				return
 			}
 
-			if sessionId != mvc.Players[0] {
+			if sessionId != mvc.HostId {
 				respondError(w, http.StatusForbidden, "not your game")
 				return
 			}
@@ -329,15 +329,7 @@ func respondError(w http.ResponseWriter, statusCode int, format string, args ...
 }
 
 func gameIsFull(mvc *components.GameState) bool {
-	return mvc.Players[0] != "" && mvc.Players[1] != ""
-}
-
-func addPlayer(mvc *components.GameState, sessionId string) {
-	if mvc.Players[0] == "" {
-		mvc.Players[0] = sessionId
-	} else if mvc.Players[1] == "" {
-		mvc.Players[1] = sessionId
-	}
+	return mvc.ChallengerId != ""
 }
 
 func updateGameState(ctx context.Context, gamesKV jetstream.KeyValue, mvc *components.GameState) error {
@@ -357,11 +349,6 @@ func updateGameState(ctx context.Context, gamesKV jetstream.KeyValue, mvc *compo
 	return nil
 }
 
-func containsPlayer(players []string, player string) bool {
-	for _, p := range players {
-		if p == player {
-			return true
-		}
-	}
-	return false
+func containsPlayer(mvc *components.GameState, sessionId string) bool {
+	return mvc.HostId == sessionId || mvc.ChallengerId == sessionId
 }

@@ -13,12 +13,6 @@ import (
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-type InlineValidationUser struct {
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-	Email     string `json:"email"`
-}
-
 func inlineValidationFieldComponent(label, field string, isValid bool, isNotValidErrorLabelFmt string, labelArgs ...any) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -47,7 +41,7 @@ func inlineValidationFieldComponent(label, field string, isValid bool, isNotVali
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/index.templ`, Line: 17, Col: 35}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/index.templ`, Line: 11, Col: 35}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -57,7 +51,7 @@ func inlineValidationFieldComponent(label, field string, isValid bool, isNotVali
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var3 = []any{"input input-bordered", templ.KV("input-error", !isValid)}
+		var templ_7745c5c3_Var3 = []any{"input input-bordered text-accent", templ.KV("input-error", !isValid)}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var3...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -82,7 +76,7 @@ func inlineValidationFieldComponent(label, field string, isValid bool, isNotVali
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(field)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/index.templ`, Line: 21, Col: 20}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/index.templ`, Line: 15, Col: 20}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -93,9 +87,9 @@ func inlineValidationFieldComponent(label, field string, isValid bool, isNotVali
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.GetSSE("/examples/inline_validation/data"))
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.GetSSE("/api/index"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/index.templ`, Line: 22, Col: 88}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/index.templ`, Line: 16, Col: 66}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -113,7 +107,7 @@ func inlineValidationFieldComponent(label, field string, isValid bool, isNotVali
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(isNotValidErrorLabelFmt, labelArgs...))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/index.templ`, Line: 25, Col: 100}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/index.templ`, Line: 19, Col: 100}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -132,7 +126,7 @@ func inlineValidationFieldComponent(label, field string, isValid bool, isNotVali
 	})
 }
 
-func inlineValidationUserComponent(u *InlineValidationUser, isNameValid, isValid bool) templ.Component {
+func InlineValidationUserComponent(u *InlineValidationUser, isNameValid bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -158,9 +152,9 @@ func inlineValidationUserComponent(u *InlineValidationUser, isNameValid, isValid
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
-		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs("{disabled:'true'}")
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(templ.JSONString(u))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/index.templ`, Line: 33, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/index.templ`, Line: 25, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -170,7 +164,7 @@ func inlineValidationUserComponent(u *InlineValidationUser, isNameValid, isValid
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = inlineValidationFieldComponent("Name", "name", isNameValid, "Name must be at least 2 characters.").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = inlineValidationFieldComponent("Enter Your Name:", "name", isNameValid, "Name must be at least 2 characters.").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -178,16 +172,26 @@ func inlineValidationUserComponent(u *InlineValidationUser, isNameValid, isValid
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
+		if !isNameValid {
+			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 13)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 14)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.PostSSE("api/index/login"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/index.templ`, Line: 38, Col: 92}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/index.templ`, Line: 36, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 13)
+		templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 15)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

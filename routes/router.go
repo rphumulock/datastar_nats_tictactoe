@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net/http"
 	"time"
 
+	"github.com/delaneyj/toolbelt"
 	"github.com/delaneyj/toolbelt/embeddednats"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
@@ -53,19 +55,28 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 		return nil, err
 	}
 
-	// Create or update the "games" KV bucket
 	_, err = js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
 		Bucket:      "games",
 		Description: "Datastar Tic Tac Toe Game",
 		Compression: true,
-		TTL:         time.Minute * 20,
+		TTL:         time.Hour,
 		MaxBytes:    16 * 1024 * 1024,
 	})
 	if err != nil {
 		return cleanup, fmt.Errorf("error creating key value: %w", err)
 	}
 
-	// Create or update the "users" KV bucket
+	_, err = js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
+		Bucket:      "openGames",
+		Description: "Datastar Tic Tac Toe Game",
+		Compression: true,
+		TTL:         time.Hour,
+		MaxBytes:    16 * 1024 * 1024,
+	})
+	if err != nil {
+		return cleanup, fmt.Errorf("error creating key value: %w", err)
+	}
+
 	_, err = js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
 		Bucket:      "users",
 		Description: "Datastar Tic Tac Toe Game",
@@ -86,4 +97,42 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 	}
 
 	return cleanup, nil
+}
+
+func createSessionId(store sessions.Store, r *http.Request, w http.ResponseWriter) (string, error) {
+	sess, err := store.Get(r, "connections")
+	if err != nil {
+		return "", fmt.Errorf("failed to get session: %w", err)
+	}
+	id := toolbelt.NextEncodedID()
+	sess.Values["id"] = id
+	if err := sess.Save(r, w); err != nil {
+		return "", fmt.Errorf("failed to save session: %w", err)
+	}
+	return id, nil
+}
+
+func getSessionId(store sessions.Store, r *http.Request) (string, error) {
+	sess, err := store.Get(r, "connections")
+	if err != nil {
+		return "", fmt.Errorf("failed to get session: %w", err)
+	}
+	id, ok := sess.Values["id"].(string)
+	if !ok || id == "" {
+		return "", nil // No session ID exists
+	}
+	return id, nil
+}
+
+func deleteSessionId(store sessions.Store, w http.ResponseWriter, r *http.Request) {
+	session, err := store.Get(r, "connections")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to get session: %v", err), http.StatusInternalServerError)
+		return
+	}
+	delete(session.Values, "id")
+	if err := session.Save(r, w); err != nil {
+		http.Error(w, fmt.Sprintf("failed to save session: %v", err), http.StatusInternalServerError)
+		return
+	}
 }
