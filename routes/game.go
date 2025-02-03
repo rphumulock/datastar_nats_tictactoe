@@ -19,9 +19,14 @@ import (
 func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStream) error {
 	ctx := context.Background()
 
-	gamesKV, err := js.KeyValue(ctx, "games")
+	gameLobbiesKV, err := js.KeyValue(ctx, "gameLobbies")
 	if err != nil {
-		return fmt.Errorf("failed to get games key-value store: %w", err)
+		return fmt.Errorf("failed to get game lobbies key value: %w", err)
+	}
+
+	gameBoardsKV, err := js.KeyValue(ctx, "gameBoards")
+	if err != nil {
+		return fmt.Errorf("failed to get game boards key value: %w", err)
 	}
 
 	router.Get("/game/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -44,9 +49,14 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			gameState, err := fetchGameState(ctx, gamesKV, id)
+			entry, err := gameBoardsKV.Get(ctx, id)
 			if err != nil {
 				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
+				return
+			}
+			gameState := &components.GameState{}
+			if err := json.Unmarshal(entry.Value(), gameState); err != nil {
+				respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
 				return
 			}
 
@@ -56,19 +66,24 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			if gameIsFull(gameState) && !containsPlayer(gameState, sessionId) {
+			if gameState.ChallengerId != "" && !containsPlayer(gameState, sessionId) {
 				respondError(w, http.StatusForbidden, "game is full")
 				return
 			}
 
 			if !containsPlayer(gameState, sessionId) {
 				gameState.ChallengerId = sessionId
-				if err := updateGameState(ctx, gamesKV, gameState); err != nil {
+				data, err := json.Marshal(gameState)
+				if err != nil {
+					respondError(w, http.StatusInternalServerError, "error marshalling game state: %v", err)
+					return
+				}
+				if _, err := gameLobbiesKV.Update(ctx, gameState.Id, data, entry.Revision()); err != nil {
 					respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
 					return
 				}
 			}
-			c := components.Game(gameState, sessionId)
+			c := components.GameContainer(sessionId, gameState)
 			if err := sse.MergeFragmentTempl(c); err != nil {
 				sse.ConsoleError(err)
 				return
@@ -90,7 +105,7 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			watcher, err := gamesKV.Watch(ctx, id)
+			watcher, err := gameBoardsKV.Watch(ctx, id)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("Failed to start watcher: %v", err), http.StatusInternalServerError)
 				return
@@ -120,7 +135,7 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 
 					c := components.GameBoard(mvc, sessionId)
 					if err := sse.MergeFragmentTempl(c,
-						datastar.WithSelectorID("game-container"),
+						datastar.WithSelectorID("gameboard"),
 						datastar.WithMergeMorph(),
 					); err != nil {
 						sse.ConsoleError(err)
@@ -142,10 +157,25 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			mvc, err := fetchGameState(ctx, gamesKV, id)
+			entry, err := gameLobbiesKV.Get(ctx, id)
 			if err != nil {
-				sse.ExecuteScript("alert('Error retrieving game state')")
 				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
+				return
+			}
+			gameLobby := &components.GameLobby{}
+			if err := json.Unmarshal(entry.Value(), gameLobby); err != nil {
+				respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
+				return
+			}
+
+			entry, err = gameBoardsKV.Get(ctx, id)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
+				return
+			}
+			gameState := &components.GameState{}
+			if err := json.Unmarshal(entry.Value(), gameState); err != nil {
+				respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
 				return
 			}
 
@@ -158,46 +188,56 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 
 			cell := chi.URLParam(r, "cell")
 			i, err := strconv.Atoi(cell)
-			if err != nil || i < 0 || i >= len(mvc.Board) {
+			if err != nil || i < 0 || i >= len(gameState.Board) {
 				sse.ExecuteScript("alert('Invalid cell index')")
 				respondError(w, http.StatusBadRequest, "invalid cell index")
 				return
 			}
 
-			if mvc.Board[i] != "" {
+			if gameState.Board[i] != "" {
 				sse.ExecuteScript("alert('Cell already occupied')")
 				respondError(w, http.StatusBadRequest, "cell already occupied")
 				return
 			}
 
-			if mvc.XIsNext && sessionId != mvc.HostId {
+			if gameState.XIsNext && sessionId != gameState.HostId {
 				sse.ExecuteScript("alert('Not your turn')")
 				respondError(w, http.StatusForbidden, "not your turn")
 				return
 			}
-			if !mvc.XIsNext && sessionId != mvc.ChallengerId {
+			if !gameState.XIsNext && sessionId != gameState.ChallengerId {
 				sse.ExecuteScript("alert('Not your turn')")
 				respondError(w, http.StatusForbidden, "not your turn")
 				return
 			}
 
-			if mvc.XIsNext {
-				mvc.Board[i] = "X"
+			if gameState.XIsNext {
+				gameState.Board[i] = "X"
 			} else {
-				mvc.Board[i] = "O"
+				gameState.Board[i] = "O"
 			}
-			mvc.XIsNext = !mvc.XIsNext
+			gameState.XIsNext = !gameState.XIsNext
 
-			winner := checkWinner(mvc.Board[:])
+			winner := checkWinner(gameState.Board[:])
 			if winner == "TIE" {
-				mvc.Winner = "TIE"
+				gameState.Winner = "TIE"
 				log.Printf("Game over! Result: Tie")
 			} else if winner != "" {
-				mvc.Winner = winner
+				gameState.Winner = winner
 				log.Printf("Game over! Winner: %s", winner)
 			}
 
-			if err := updateGameState(ctx, gamesKV, mvc); err != nil {
+			data, err := json.Marshal(gameState)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "error marshalling game state: %v", err)
+				return
+			}
+			entry, err = gameBoardsKV.Get(ctx, gameState.Id)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "error retrieving current revision: %v", err)
+				return
+			}
+			if _, err := gameBoardsKV.Update(ctx, gameState.Id, data, entry.Revision()); err != nil {
 				respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
 				return
 			}
@@ -214,14 +254,29 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			mvc, err := fetchGameState(ctx, gamesKV, id)
+			entry, err := gameBoardsKV.Get(ctx, id)
 			if err != nil {
 				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
 				return
 			}
+			gameState := &components.GameState{}
+			if err := json.Unmarshal(entry.Value(), gameState); err != nil {
+				respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
+				return
+			}
 
-			mvc.ChallengerId = ""
-			if err := updateGameState(ctx, gamesKV, mvc); err != nil {
+			gameState.ChallengerId = ""
+			data, err := json.Marshal(gameState)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "error marshalling game state: %v", err)
+				return
+			}
+			entry, err = gameLobbiesKV.Get(ctx, gameState.Id)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "error retrieving current revision: %v", err)
+				return
+			}
+			if _, err := gameLobbiesKV.Update(ctx, gameState.Id, data, entry.Revision()); err != nil {
 				respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
 				return
 			}
@@ -236,9 +291,14 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			mvc, err := fetchGameState(ctx, gamesKV, id)
+			entry, err := gameLobbiesKV.Get(ctx, id)
 			if err != nil {
 				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
+				return
+			}
+			gameState := &components.GameState{}
+			if err := json.Unmarshal(entry.Value(), gameState); err != nil {
+				respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
 				return
 			}
 
@@ -248,16 +308,26 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			if sessionId != mvc.HostId {
+			if sessionId != gameState.HostId {
 				respondError(w, http.StatusForbidden, "not your game")
 				return
 			}
 
-			mvc.Board = [9]string{"", "", "", "", "", "", "", "", ""}
-			mvc.Winner = ""
-			mvc.XIsNext = true
+			gameState.Board = [9]string{"", "", "", "", "", "", "", "", ""}
+			gameState.Winner = ""
+			gameState.XIsNext = true
 
-			if err := updateGameState(ctx, gamesKV, mvc); err != nil {
+			data, err := json.Marshal(gameState)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "error marshalling game state: %v", err)
+				return
+			}
+			entry, err = gameBoardsKV.Get(ctx, gameState.Id)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "error retrieving current revision: %v", err)
+				return
+			}
+			if _, err := gameBoardsKV.Update(ctx, gameState.Id, data, entry.Revision()); err != nil {
 				respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
 				return
 			}
@@ -267,20 +337,6 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 	})
 
 	return nil
-}
-
-func fetchGameState(ctx context.Context, gamesKV jetstream.KeyValue, id string) (*components.GameState, error) {
-	entry, err := gamesKV.Get(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	mvc := &components.GameState{}
-	if err := json.Unmarshal(entry.Value(), mvc); err != nil {
-		return nil, fmt.Errorf("error unmarshalling game state: %w", err)
-	}
-
-	return mvc, nil
 }
 
 func checkWinner(board []string) string {
@@ -326,27 +382,6 @@ func checkWinner(board []string) string {
 func respondError(w http.ResponseWriter, statusCode int, format string, args ...interface{}) {
 	message := fmt.Sprintf(format, args...)
 	http.Error(w, message, statusCode)
-}
-
-func gameIsFull(mvc *components.GameState) bool {
-	return mvc.ChallengerId != ""
-}
-
-func updateGameState(ctx context.Context, gamesKV jetstream.KeyValue, mvc *components.GameState) error {
-	data, err := json.Marshal(mvc)
-	if err != nil {
-		return fmt.Errorf("error marshalling game state: %v", err)
-	}
-
-	entry, err := gamesKV.Get(ctx, mvc.Id)
-	if err != nil {
-		return fmt.Errorf("error retrieving current revision: %v", err)
-	}
-
-	if _, err := gamesKV.Update(ctx, mvc.Id, data, entry.Revision()); err != nil {
-		return fmt.Errorf("error updating game state: %v", err)
-	}
-	return nil
 }
 
 func containsPlayer(mvc *components.GameState, sessionId string) bool {

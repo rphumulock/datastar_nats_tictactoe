@@ -20,19 +20,19 @@ templ DashboardItem(gameState *GameState, sessionId string) {
 		</h6>
 		<!-- Status Message (Ensures Equal Space) -->
 		<div class="flex-grow flex flex-col items-center justify-center w-full">
-			<a
-				class="btn btn-primary rounded-none flex items-center justify-center text-center text-secondary-content w-full m-2"
-				href={ templ.URL(fmt.Sprintf("/game/%s", gameState.Id)) }
+			<button
+				class="btn btn-primary rounded-none flex items-center justify-center text-center text-primary-content w-full m-2 h-12"
+				data-on-click={ datastar.PostSSE("/api/dashboard/%s/join", gameState.Id) }
 			>
-				Join Game
-			</a>
+				Join
+			</button>
 		</div>
 		<!-- Delete Button (if Host) -->
 		<div class="h-12 w-full">
 			if isHost {
 				<button
 					class="btn btn-secondary rounded-none flex items-center justify-center text-center text-secondary-content w-full m-2 h-12"
-					data-on-click={ datastar.DeleteSSE(fmt.Sprintf("/api/dashboard/lobby/%s/delete", gameState.Id)) }
+					data-on-click={ datastar.DeleteSSE("/api/dashboard/%s/delete", gameState.Id) }
 				>
 					Delete
 				</button>

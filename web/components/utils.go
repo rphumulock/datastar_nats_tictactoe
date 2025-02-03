@@ -9,18 +9,17 @@ type User struct {
 	SessionId string `json:"session_id"`
 }
 
-type OpenGames struct {
-	Id       string `json:"id"`
-	HostId   string `json:"host_id"`
-	HostName string `json:"host_name"`
+type GameLobby struct {
+	Id             string `json:"id"`
+	HostId         string `json:"host_id"`
+	HostName       string `json:"host_name"`
+	ChallengerName string `json:"challenger_name"`
+	ChallengerId   string `json:"challenger_id"`
 }
 
 type GameState struct {
-	Id           string    `json:"id"`
-	HostId       string    `json:"host_id"`
-	HostName     string    `json:"host_name"`
-	ChallengerId string    `json:"challenger_id"`
-	Board        [9]string `json:"board"`
-	XIsNext      bool      `json:"turn"`
-	Winner       string    `json:"winner"`
+	Id      string    `json:"id"`
+	Board   [9]string `json:"board"`
+	XIsNext bool      `json:"turn"`
+	Winner  string    `json:"winner"`
 }

@@ -33,7 +33,7 @@ templ Dashboard(name string) {
 					<div class="flex gap-3">
 						<button
 							class="btn btn-primary rounded-none flex items-center justify-center text-center text-primary-content"
-							data-on-click={ datastar.PostSSE("/api/dashboard/lobby/create") }
+							data-on-click={ datastar.PostSSE("/api/dashboard/create") }
 						>
 							Create Game
 						</button>
@@ -45,7 +45,7 @@ templ Dashboard(name string) {
 						</button>
 						<button
 							class="btn btn-error rounded-none flex items-center justify-center text-center text-error-content"
-							data-on-click={ datastar.DeleteSSE("/api/dashboard/lobby/purge") }
+							data-on-click={ datastar.DeleteSSE("/api/dashboard/purge") }
 						>
 							Delete Games
 						</button>
@@ -55,7 +55,7 @@ templ Dashboard(name string) {
 					id="list-container"
 					class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full overflow-y-auto"
 					style="max-height: 75vh;"
-					data-on-load={ datastar.GetSSE("/api/dashboard/lobby/watch") }
+					data-on-load={ datastar.GetSSE("/api/dashboard/watch") }
 				></div>
 			</main>
 		</div>

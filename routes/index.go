@@ -20,7 +20,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 
 	usersKV, err := js.KeyValue(ctx, "users")
 	if err != nil {
-		return fmt.Errorf("failed to get games key value: %w", err)
+		return fmt.Errorf("failed to get users key value: %w", err)
 	}
 
 	saveUser := func(ctx context.Context, user *components.User) error {

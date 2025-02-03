@@ -7,7 +7,7 @@ import (
 
 templ Game(id string) {
 	@layouts.Base() {
-		<div class="flex flex-col min-h-screen max-h-screen overflow-hidden" data-on-load={ datastar.GetSSE("/api/game/%s/watch", id) }>
+		<div class="flex flex-col min-h-screen max-h-screen overflow-hidden">
 			<!-- Navigation Bar -->
 			<nav class="bg-base-300 text-base-content py-4 shadow-lg">
 				<div class="container mx-auto flex items-center justify-between px-6">

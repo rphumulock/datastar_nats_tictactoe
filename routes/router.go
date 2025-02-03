@@ -56,7 +56,7 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 	}
 
 	_, err = js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
-		Bucket:      "games",
+		Bucket:      "gameLobbies",
 		Description: "Datastar Tic Tac Toe Game",
 		Compression: true,
 		TTL:         time.Hour,
@@ -67,7 +67,7 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 	}
 
 	_, err = js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
-		Bucket:      "openGames",
+		Bucket:      "gameBoards",
 		Description: "Datastar Tic Tac Toe Game",
 		Compression: true,
 		TTL:         time.Hour,

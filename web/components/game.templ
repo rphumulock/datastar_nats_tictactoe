@@ -5,7 +5,7 @@ import (
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-templ Game(gameState *GameState, sessionId string) {
+templ GameContainer(sessionId string, gameState *GameState) {
 	{{
 		var host string
 		if gameState.HostId == sessionId {
@@ -14,7 +14,7 @@ templ Game(gameState *GameState, sessionId string) {
 			host = gameState.HostName
 		}
 	}}
-	<main id="main-container" class="flex flex-col flex-grow w-full p-4 overflow-hidden h-screen">
+	<main id="main-container" class="flex flex-col flex-grow w-full p-4 h-screen">
 		<!-- Game Header -->
 		<div class="flex justify-between items-center p-4 bg-accent shadow-md w-full">
 			<div class="text-lg font-bold text-secondary-content">Game: { gameState.Id }</div>
@@ -29,17 +29,23 @@ templ Game(gameState *GameState, sessionId string) {
 				}
 			</div>
 		</div>
-		<!-- Game Board Container (Centers the board properly) -->
-		<div class="flex flex-grow items-center justify-center bg-base-300 mt-2">
-			@GameBoard(gameState, sessionId)
+		<!-- Scrollable Game Container -->
+		<div
+			class="flex flex-grow items-center justify-center bg-base-300 mt-2 overflow-y-auto max-h-[75vh] w-full"
+			data-on-load={ datastar.GetSSE("/api/game/%s/watch", gameState.Id) }
+		>
+			if gameState.Winner != "" {
+				@GameWinner(sessionId, gameState)
+			} else {
+				@GameBoard(gameState, sessionId)
+			}
 		</div>
 	</main>
 }
 
 templ GameBoard(gameState *GameState, sessionId string) {
-	<!-- Ensures the game board takes up full available space -->
 	<div
-		id="game-container"
+		id="gameboard"
 		class="grid grid-cols-3 grid-rows-3 gap-2 w-full max-w-[600px] aspect-square"
 	>
 		for i, cell := range gameState.Board {
@@ -49,7 +55,6 @@ templ GameBoard(gameState *GameState, sessionId string) {
 }
 
 templ Cell(id string, cell string, i int, gameState *GameState, sessionId string) {
-	<!-- Ensures each cell is square, evenly spaced, and interactive -->
 	<button
 		id={ "cell-" + fmt.Sprintf("%d", i) }
 		class="w-full h-full bg-accent border-base-content border-4 flex items-center justify-center text-5xl text-accent-content font-bold cursor-pointer aspect-square transition-all duration-300"
@@ -62,7 +67,7 @@ templ Cell(id string, cell string, i int, gameState *GameState, sessionId string
 	</button>
 }
 
-templ GameWinner(gameState *GameState, sessionId string) {
+templ GameWinner(sessionId string, gameState *GameState) {
 	<div
 		class="absolute inset-0 flex flex-col items-center justify-center bg-opacity-90 bg-green-500 text-white z-10 p-8  shadow-lg"
 		aria-live="assertive"
