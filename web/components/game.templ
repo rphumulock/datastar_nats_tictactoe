@@ -5,25 +5,25 @@ import (
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-templ GameContainer(sessionId string, gameState *GameState) {
+templ GameContainer(sessionId string, gameLobby *GameLobby, gameState *GameState) {
 	{{
 		var host string
-		if gameState.HostId == sessionId {
+		if gameLobby.HostId == sessionId {
 			host = "You!"
 		} else {
-			host = gameState.HostName
+			host = gameLobby.HostName
 		}
 	}}
 	<main id="main-container" class="flex flex-col flex-grow w-full p-4 h-screen">
 		<!-- Game Header -->
 		<div class="flex justify-between items-center p-4 bg-accent shadow-md w-full">
-			<div class="text-lg font-bold text-secondary-content">Game: { gameState.Id }</div>
+			<div class="text-lg font-bold text-secondary-content">Game: { gameLobby.Id }</div>
 			<div class="text-lg font-bold text-secondary-content">Host: { host }</div>
 			<div class="text-lg font-bold text-secondary-content">
-				if (sessionId == gameState.HostId) {
+				if (sessionId == gameLobby.HostId) {
 					<a class="btn btn-secondary rounded-none" href="/dashboard">Back to Dashboard</a>
 				} else {
-					<button class="btn btn-secondary rounded-none" data-on-click={ datastar.PostSSE("/api/game/%s/leave", gameState.Id) }>
+					<button class="btn btn-secondary rounded-none" data-on-click={ datastar.PostSSE("/api/game/%s/leave", gameLobby.Id) }>
 						Leave Game
 					</button>
 				}
@@ -32,13 +32,13 @@ templ GameContainer(sessionId string, gameState *GameState) {
 		<!-- Scrollable Game Container -->
 		<div
 			class="flex flex-grow items-center justify-center bg-base-300 mt-2 overflow-y-auto max-h-[75vh] w-full"
-			data-on-load={ datastar.GetSSE("/api/game/%s/watch", gameState.Id) }
+			data-on-load={ datastar.GetSSE("/api/game/%s/watch", gameLobby.Id) }
 		>
-			if gameState.Winner != "" {
-				@GameWinner(sessionId, gameState)
-			} else {
-				@GameBoard(gameState, sessionId)
-			}
+			// if gameState.Winner != "" {
+			// 	@GameWinner(sessionId, gameState)
+			// } else {
+			// 	@GameBoard(gameState, sessionId)
+			// }
 		</div>
 	</main>
 }
@@ -83,30 +83,30 @@ templ GameWinner(sessionId string, gameState *GameState) {
 				🎉 { gameState.Winner } Wins! 🎉
 			</h1>
 		}
-		<!-- Play Again Button -->
-		if (sessionId == gameState.HostId) {
-			<button
-				class="btn btn-primary text-xl  mb-4"
-				data-on-click={ datastar.PostSSE("/api/game/%s/reset", gameState.Id) }
-			>
-				Play Again
-			</button>
-		}
-		<!-- Back to Dashboard Button -->
-		if (sessionId == gameState.HostId) {
-			<a
-				class="btn btn-secondary text-xl "
-				href="/"
-			>
-				Back to Dashboard
-			</a>
-		} else {
-			<button
-				class="btn btn-secondary text-xl"
-				data-on-click={ datastar.PostSSE("/api/game/%s/leave", gameState.Id) }
-			>
-				Back to Dashboard
-			</button>
-		}
+		// <!-- Play Again Button -->
+		// if (sessionId == gameState.HostId) {
+		// 	<button
+		// 		class="btn btn-primary text-xl  mb-4"
+		// 		data-on-click={ datastar.PostSSE("/api/game/%s/reset", gameState.Id) }
+		// 	>
+		// 		Play Again
+		// 	</button>
+		// }
+		// <!-- Back to Dashboard Button -->
+		// if (sessionId == gameState.HostId) {
+		// 	<a
+		// 		class="btn btn-secondary text-xl "
+		// 		href="/"
+		// 	>
+		// 		Back to Dashboard
+		// 	</a>
+		// } else {
+		// 	<button
+		// 		class="btn btn-secondary text-xl"
+		// 		data-on-click={ datastar.PostSSE("/api/game/%s/leave", gameState.Id) }
+		// 	>
+		// 		Back to Dashboard
+		// 	</button>
+		// }
 	</div>
 }

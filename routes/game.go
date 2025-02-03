@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
@@ -42,54 +41,117 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 	router.Route("/api/game/{id}", func(gameRouter chi.Router) {
 
 		gameRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
+				return
+			}
+			sessionId, err := getSessionId(store, r)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			gameState, _, err := GetObject[components.GameState](ctx, gameBoardsKV, id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			gameLobby, _, err := GetObject[components.GameLobby](ctx, gameLobbiesKV, id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
 			sse := datastar.NewSSE(w, r)
+			c := components.GameContainer(sessionId, gameLobby, gameState)
+			if err := sse.MergeFragmentTempl(c); err != nil {
+				sse.ConsoleError(err)
+				return
+			}
+		})
+
+		gameRouter.Post("/leave", func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+
 			id := chi.URLParam(r, "id")
 			if id == "" {
 				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
 				return
 			}
 
-			entry, err := gameBoardsKV.Get(ctx, id)
+			gameLobby, entry, err := GetObject[components.GameLobby](ctx, gameLobbiesKV, id)
 			if err != nil {
-				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
-				return
-			}
-			gameState := &components.GameState{}
-			if err := json.Unmarshal(entry.Value(), gameState); err != nil {
-				respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
-			sessionId, err := getSessionId(store, r)
-			if err != nil || sessionId == "" {
-				respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
+			gameLobby.ChallengerId = ""
+			gameLobby.Status = "open"
+			data, err := json.Marshal(gameLobby)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "error marshalling game state: %v", err)
 				return
 			}
 
-			if gameState.ChallengerId != "" && !containsPlayer(gameState, sessionId) {
-				respondError(w, http.StatusForbidden, "game is full")
+			if _, err := gameLobbiesKV.Update(ctx, gameLobby.Id, data, entry.Revision()); err != nil {
+				respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
 				return
 			}
 
-			if !containsPlayer(gameState, sessionId) {
-				gameState.ChallengerId = sessionId
-				data, err := json.Marshal(gameState)
-				if err != nil {
-					respondError(w, http.StatusInternalServerError, "error marshalling game state: %v", err)
-					return
-				}
-				if _, err := gameLobbiesKV.Update(ctx, gameState.Id, data, entry.Revision()); err != nil {
-					respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
-					return
-				}
-			}
-			c := components.GameContainer(sessionId, gameState)
-			if err := sse.MergeFragmentTempl(c); err != nil {
-				sse.ConsoleError(err)
-				return
-			}
-
+			sse := datastar.NewSSE(w, r)
+			sse.Redirect("/")
 		})
+
+		// gameRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		// 	sse := datastar.NewSSE(w, r)
+		// 	id := chi.URLParam(r, "id")
+		// 	if id == "" {
+		// 		respondError(w, http.StatusBadRequest, "missing 'id' parameter")
+		// 		return
+		// 	}
+
+		// 	entry, err := gameBoardsKV.Get(ctx, id)
+		// 	if err != nil {
+		// 		respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
+		// 		return
+		// 	}
+		// 	gameState := &components.GameState{}
+		// 	if err := json.Unmarshal(entry.Value(), gameState); err != nil {
+		// 		respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
+		// 		return
+		// 	}
+
+		// 	sessionId, err := getSessionId(store, r)
+		// 	if err != nil || sessionId == "" {
+		// 		respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
+		// 		return
+		// 	}
+
+		// 	if gameState.ChallengerId != "" && !containsPlayer(gameState, sessionId) {
+		// 		respondError(w, http.StatusForbidden, "game is full")
+		// 		return
+		// 	}
+
+		// 	if !containsPlayer(gameState, sessionId) {
+		// 		gameState.ChallengerId = sessionId
+		// 		data, err := json.Marshal(gameState)
+		// 		if err != nil {
+		// 			respondError(w, http.StatusInternalServerError, "error marshalling game state: %v", err)
+		// 			return
+		// 		}
+		// 		if _, err := gameLobbiesKV.Update(ctx, gameState.Id, data, entry.Revision()); err != nil {
+		// 			respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
+		// 			return
+		// 		}
+		// 	}
+		// 	c := components.GameContainer(sessionId, gameState)
+		// 	if err := sse.MergeFragmentTempl(c); err != nil {
+		// 		sse.ConsoleError(err)
+		// 		return
+		// 	}
+
+		// })
 
 		gameRouter.Get("/watch", func(w http.ResponseWriter, r *http.Request) {
 			sse := datastar.NewSSE(w, r)
@@ -147,193 +209,154 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 			}
 		})
 
-		gameRouter.Post("/toggle/{cell}", func(w http.ResponseWriter, r *http.Request) {
-			sse := datastar.NewSSE(w, r)
+		// gameRouter.Post("/toggle/{cell}", func(w http.ResponseWriter, r *http.Request) {
+		// 	sse := datastar.NewSSE(w, r)
 
-			id := chi.URLParam(r, "id")
-			if id == "" {
-				sse.ExecuteScript("alert('Missing game ID')")
-				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
-				return
-			}
+		// 	id := chi.URLParam(r, "id")
+		// 	if id == "" {
+		// 		sse.ExecuteScript("alert('Missing game ID')")
+		// 		respondError(w, http.StatusBadRequest, "missing 'id' parameter")
+		// 		return
+		// 	}
 
-			entry, err := gameLobbiesKV.Get(ctx, id)
-			if err != nil {
-				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
-				return
-			}
-			gameLobby := &components.GameLobby{}
-			if err := json.Unmarshal(entry.Value(), gameLobby); err != nil {
-				respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
-				return
-			}
+		// 	entry, err := gameLobbiesKV.Get(ctx, id)
+		// 	if err != nil {
+		// 		respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
+		// 		return
+		// 	}
+		// 	gameLobby := &components.GameLobby{}
+		// 	if err := json.Unmarshal(entry.Value(), gameLobby); err != nil {
+		// 		respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
+		// 		return
+		// 	}
 
-			entry, err = gameBoardsKV.Get(ctx, id)
-			if err != nil {
-				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
-				return
-			}
-			gameState := &components.GameState{}
-			if err := json.Unmarshal(entry.Value(), gameState); err != nil {
-				respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
-				return
-			}
+		// 	entry, err = gameBoardsKV.Get(ctx, id)
+		// 	if err != nil {
+		// 		respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
+		// 		return
+		// 	}
+		// 	gameState := &components.GameState{}
+		// 	if err := json.Unmarshal(entry.Value(), gameState); err != nil {
+		// 		respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
+		// 		return
+		// 	}
 
-			sessionId, err := getSessionId(store, r)
-			if err != nil || sessionId == "" {
-				sse.ExecuteScript("alert('Error getting session ID')")
-				respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
-				return
-			}
+		// 	sessionId, err := getSessionId(store, r)
+		// 	if err != nil || sessionId == "" {
+		// 		sse.ExecuteScript("alert('Error getting session ID')")
+		// 		respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
+		// 		return
+		// 	}
 
-			cell := chi.URLParam(r, "cell")
-			i, err := strconv.Atoi(cell)
-			if err != nil || i < 0 || i >= len(gameState.Board) {
-				sse.ExecuteScript("alert('Invalid cell index')")
-				respondError(w, http.StatusBadRequest, "invalid cell index")
-				return
-			}
+		// 	cell := chi.URLParam(r, "cell")
+		// 	i, err := strconv.Atoi(cell)
+		// 	if err != nil || i < 0 || i >= len(gameState.Board) {
+		// 		sse.ExecuteScript("alert('Invalid cell index')")
+		// 		respondError(w, http.StatusBadRequest, "invalid cell index")
+		// 		return
+		// 	}
 
-			if gameState.Board[i] != "" {
-				sse.ExecuteScript("alert('Cell already occupied')")
-				respondError(w, http.StatusBadRequest, "cell already occupied")
-				return
-			}
+		// 	if gameState.Board[i] != "" {
+		// 		sse.ExecuteScript("alert('Cell already occupied')")
+		// 		respondError(w, http.StatusBadRequest, "cell already occupied")
+		// 		return
+		// 	}
 
-			if gameState.XIsNext && sessionId != gameState.HostId {
-				sse.ExecuteScript("alert('Not your turn')")
-				respondError(w, http.StatusForbidden, "not your turn")
-				return
-			}
-			if !gameState.XIsNext && sessionId != gameState.ChallengerId {
-				sse.ExecuteScript("alert('Not your turn')")
-				respondError(w, http.StatusForbidden, "not your turn")
-				return
-			}
+		// 	if gameState.XIsNext && sessionId != gameState.HostId {
+		// 		sse.ExecuteScript("alert('Not your turn')")
+		// 		respondError(w, http.StatusForbidden, "not your turn")
+		// 		return
+		// 	}
+		// 	if !gameState.XIsNext && sessionId != gameState.ChallengerId {
+		// 		sse.ExecuteScript("alert('Not your turn')")
+		// 		respondError(w, http.StatusForbidden, "not your turn")
+		// 		return
+		// 	}
 
-			if gameState.XIsNext {
-				gameState.Board[i] = "X"
-			} else {
-				gameState.Board[i] = "O"
-			}
-			gameState.XIsNext = !gameState.XIsNext
+		// 	if gameState.XIsNext {
+		// 		gameState.Board[i] = "X"
+		// 	} else {
+		// 		gameState.Board[i] = "O"
+		// 	}
+		// 	gameState.XIsNext = !gameState.XIsNext
 
-			winner := checkWinner(gameState.Board[:])
-			if winner == "TIE" {
-				gameState.Winner = "TIE"
-				log.Printf("Game over! Result: Tie")
-			} else if winner != "" {
-				gameState.Winner = winner
-				log.Printf("Game over! Winner: %s", winner)
-			}
+		// 	winner := checkWinner(gameState.Board[:])
+		// 	if winner == "TIE" {
+		// 		gameState.Winner = "TIE"
+		// 		log.Printf("Game over! Result: Tie")
+		// 	} else if winner != "" {
+		// 		gameState.Winner = winner
+		// 		log.Printf("Game over! Winner: %s", winner)
+		// 	}
 
-			data, err := json.Marshal(gameState)
-			if err != nil {
-				respondError(w, http.StatusInternalServerError, "error marshalling game state: %v", err)
-				return
-			}
-			entry, err = gameBoardsKV.Get(ctx, gameState.Id)
-			if err != nil {
-				respondError(w, http.StatusInternalServerError, "error retrieving current revision: %v", err)
-				return
-			}
-			if _, err := gameBoardsKV.Update(ctx, gameState.Id, data, entry.Revision()); err != nil {
-				respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
-				return
-			}
+		// 	data, err := json.Marshal(gameState)
+		// 	if err != nil {
+		// 		respondError(w, http.StatusInternalServerError, "error marshalling game state: %v", err)
+		// 		return
+		// 	}
+		// 	entry, err = gameBoardsKV.Get(ctx, gameState.Id)
+		// 	if err != nil {
+		// 		respondError(w, http.StatusInternalServerError, "error retrieving current revision: %v", err)
+		// 		return
+		// 	}
+		// 	if _, err := gameBoardsKV.Update(ctx, gameState.Id, data, entry.Revision()); err != nil {
+		// 		respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
+		// 		return
+		// 	}
 
-			w.WriteHeader(http.StatusOK)
-		})
+		// 	w.WriteHeader(http.StatusOK)
+		// })
 
-		gameRouter.Post("/leave", func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-			sse := datastar.NewSSE(w, r)
-			id := chi.URLParam(r, "id")
-			if id == "" {
-				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
-				return
-			}
+		// gameRouter.Post("/reset", func(w http.ResponseWriter, r *http.Request) {
+		// 	id := chi.URLParam(r, "id")
+		// 	if id == "" {
+		// 		respondError(w, http.StatusBadRequest, "missing 'id' parameter")
+		// 		return
+		// 	}
 
-			entry, err := gameBoardsKV.Get(ctx, id)
-			if err != nil {
-				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
-				return
-			}
-			gameState := &components.GameState{}
-			if err := json.Unmarshal(entry.Value(), gameState); err != nil {
-				respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
-				return
-			}
+		// 	entry, err := gameLobbiesKV.Get(ctx, id)
+		// 	if err != nil {
+		// 		respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
+		// 		return
+		// 	}
+		// 	gameState := &components.GameState{}
+		// 	if err := json.Unmarshal(entry.Value(), gameState); err != nil {
+		// 		respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
+		// 		return
+		// 	}
 
-			gameState.ChallengerId = ""
-			data, err := json.Marshal(gameState)
-			if err != nil {
-				respondError(w, http.StatusInternalServerError, "error marshalling game state: %v", err)
-				return
-			}
-			entry, err = gameLobbiesKV.Get(ctx, gameState.Id)
-			if err != nil {
-				respondError(w, http.StatusInternalServerError, "error retrieving current revision: %v", err)
-				return
-			}
-			if _, err := gameLobbiesKV.Update(ctx, gameState.Id, data, entry.Revision()); err != nil {
-				respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
-				return
-			}
+		// 	sessionId, err := getSessionId(store, r)
+		// 	if err != nil || sessionId == "" {
+		// 		respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
+		// 		return
+		// 	}
 
-			sse.Redirect("/")
-		})
+		// 	if sessionId != gameState.HostId {
+		// 		respondError(w, http.StatusForbidden, "not your game")
+		// 		return
+		// 	}
 
-		gameRouter.Post("/reset", func(w http.ResponseWriter, r *http.Request) {
-			id := chi.URLParam(r, "id")
-			if id == "" {
-				respondError(w, http.StatusBadRequest, "missing 'id' parameter")
-				return
-			}
+		// 	gameState.Board = [9]string{"", "", "", "", "", "", "", "", ""}
+		// 	gameState.Winner = ""
+		// 	gameState.XIsNext = true
 
-			entry, err := gameLobbiesKV.Get(ctx, id)
-			if err != nil {
-				respondError(w, http.StatusInternalServerError, "error retrieving game: %v", err)
-				return
-			}
-			gameState := &components.GameState{}
-			if err := json.Unmarshal(entry.Value(), gameState); err != nil {
-				respondError(w, http.StatusInternalServerError, "error unmarshalling game state: %v", err)
-				return
-			}
+		// 	data, err := json.Marshal(gameState)
+		// 	if err != nil {
+		// 		respondError(w, http.StatusInternalServerError, "error marshalling game state: %v", err)
+		// 		return
+		// 	}
+		// 	entry, err = gameBoardsKV.Get(ctx, gameState.Id)
+		// 	if err != nil {
+		// 		respondError(w, http.StatusInternalServerError, "error retrieving current revision: %v", err)
+		// 		return
+		// 	}
+		// 	if _, err := gameBoardsKV.Update(ctx, gameState.Id, data, entry.Revision()); err != nil {
+		// 		respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
+		// 		return
+		// 	}
 
-			sessionId, err := getSessionId(store, r)
-			if err != nil || sessionId == "" {
-				respondError(w, http.StatusInternalServerError, "error getting session ID: %v", err)
-				return
-			}
-
-			if sessionId != gameState.HostId {
-				respondError(w, http.StatusForbidden, "not your game")
-				return
-			}
-
-			gameState.Board = [9]string{"", "", "", "", "", "", "", "", ""}
-			gameState.Winner = ""
-			gameState.XIsNext = true
-
-			data, err := json.Marshal(gameState)
-			if err != nil {
-				respondError(w, http.StatusInternalServerError, "error marshalling game state: %v", err)
-				return
-			}
-			entry, err = gameBoardsKV.Get(ctx, gameState.Id)
-			if err != nil {
-				respondError(w, http.StatusInternalServerError, "error retrieving current revision: %v", err)
-				return
-			}
-			if _, err := gameBoardsKV.Update(ctx, gameState.Id, data, entry.Revision()); err != nil {
-				respondError(w, http.StatusInternalServerError, "error updating game state: %v", err)
-				return
-			}
-
-			w.WriteHeader(http.StatusOK)
-		})
+		// 	w.WriteHeader(http.StatusOK)
+		// })
 	})
 
 	return nil
@@ -384,6 +407,6 @@ func respondError(w http.ResponseWriter, statusCode int, format string, args ...
 	http.Error(w, message, statusCode)
 }
 
-func containsPlayer(mvc *components.GameState, sessionId string) bool {
-	return mvc.HostId == sessionId || mvc.ChallengerId == sessionId
-}
+// func containsPlayer(mvc *components.GameState, sessionId string) bool {
+// 	return mvc.HostId == sessionId || mvc.ChallengerId == sessionId
+// }

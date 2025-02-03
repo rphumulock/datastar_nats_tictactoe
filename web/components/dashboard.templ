@@ -5,24 +5,27 @@ import (
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-templ DashboardItem(gameState *GameState, sessionId string) {
+templ DashboardItem(gameLobby *GameLobby, sessionId string) {
 	{{
-		isHost := gameState.HostId == sessionId
-		selector := fmt.Sprintf("game-%s", gameState.Id)
+		isHost := gameLobby.HostId == sessionId
+		selector := fmt.Sprintf("game-%s", gameLobby.Id)
 	}}
 	<div id={ selector } class="p-6 bg-base-300 text-base-content shadow-lg flex flex-col items-center justify-between w-full min-h-[220px]">
 		<!-- Game ID -->
 		<h6 class="tracking-widest text-secondary-content text-lg font-bold">
-			Game: { gameState.Id }
+			Game: { gameLobby.Id }
 		</h6>
 		<h6 class="tracking-widest text-secondary-content text-lg font-bold">
-			Hosted By: { gameState.HostName }
+			Hosted By: { gameLobby.HostName }
 		</h6>
+		<p>
+			Status: { gameLobby.Status }
+		</p>
 		<!-- Status Message (Ensures Equal Space) -->
 		<div class="flex-grow flex flex-col items-center justify-center w-full">
 			<button
 				class="btn btn-primary rounded-none flex items-center justify-center text-center text-primary-content w-full m-2 h-12"
-				data-on-click={ datastar.PostSSE("/api/dashboard/%s/join", gameState.Id) }
+				data-on-click={ datastar.PostSSE("/api/dashboard/%s/join", gameLobby.Id) }
 			>
 				Join
 			</button>
@@ -32,7 +35,7 @@ templ DashboardItem(gameState *GameState, sessionId string) {
 			if isHost {
 				<button
 					class="btn btn-secondary rounded-none flex items-center justify-center text-center text-secondary-content w-full m-2 h-12"
-					data-on-click={ datastar.DeleteSSE("/api/dashboard/%s/delete", gameState.Id) }
+					data-on-click={ datastar.DeleteSSE("/api/dashboard/%s/delete", gameLobby.Id) }
 				>
 					Delete
 				</button>

@@ -13,8 +13,9 @@ type GameLobby struct {
 	Id             string `json:"id"`
 	HostId         string `json:"host_id"`
 	HostName       string `json:"host_name"`
-	ChallengerName string `json:"challenger_name"`
 	ChallengerId   string `json:"challenger_id"`
+	ChallengerName string `json:"challenger_name"`
+	Status         string `json:"status"`
 }
 
 type GameState struct {

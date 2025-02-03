@@ -17,28 +17,29 @@ import (
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-// set game lobby all in here with join and everything
-
-// do board in game.
-
-func GetObject[T any](ctx context.Context, kv jetstream.KeyValue, key string) (*T, error) {
+func GetObject[T any](ctx context.Context, kv jetstream.KeyValue, key string) (*T, jetstream.KeyValueEntry, error) {
 	entry, err := kv.Get(ctx, key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get key %s: %w", key, err)
+		return nil, nil, fmt.Errorf("failed to get key %s: %w", key, err)
 	}
 
 	var obj T
 	if err := json.Unmarshal(entry.Value(), &obj); err != nil {
-		return nil, fmt.Errorf("error unmarshalling object: %w", err)
+		return nil, nil, fmt.Errorf("failed to unmarshal value for key %s: %w", key, err)
 	}
 
-	return &obj, nil
+	return &obj, entry, nil
 }
 
 func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.JetStream) error {
 	ctx := context.Background()
 
 	gameLobbiesKV, err := js.KeyValue(ctx, "gameLobbies")
+	if err != nil {
+		return fmt.Errorf("failed to get game lobbies key value: %w", err)
+	}
+
+	gameBoardsKV, err := js.KeyValue(ctx, "gameBoards")
 	if err != nil {
 		return fmt.Errorf("failed to get game lobbies key value: %w", err)
 	}
@@ -59,7 +60,7 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 			return
 		}
 
-		user, err := GetObject[components.User](ctx, usersKV, sessionId)
+		user, _, err := GetObject[components.User](ctx, usersKV, sessionId)
 		if err != nil {
 			deleteSessionId(store, w, r)
 			http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -81,43 +82,55 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 					return
 				}
 
-				gameLobby, err := GetObject[components.GameLobby](ctx, gameLobbiesKV, id)
+				sessionId, err := getSessionId(store, r)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+
+				user, _, err := GetObject[components.User](ctx, usersKV, sessionId)
+				if err != nil {
+					http.Error(w, fmt.Sprintf("failed to get user: %v", err), http.StatusInternalServerError)
+					return
+				}
+
+				gameLobby, _, err := GetObject[components.GameLobby](ctx, gameLobbiesKV, id)
 				if err != nil {
 					deleteSessionId(store, w, r)
 					http.Redirect(w, r, "/", http.StatusSeeOther)
 					return
 				}
-				gameLobby.ChallengerId = id
-				bytes, err = json.Marshal(gameboard)
-				if err != nil {
-					http.Error(w, fmt.Sprintf("failed to marshal mvc: %v", err), http.StatusInternalServerError)
-					return
-				}
-				_, err = gameBoardsKV.Put(r.Context(), id, bytes)
-				if err != nil {
-					http.Error(w, fmt.Sprintf("failed to put key value: %v", err), http.StatusInternalServerError)
-					return
-				}
 
+				sse := datastar.NewSSE(w, r)
+				if sessionId != gameLobby.HostId {
+
+					gameLobby.ChallengerId = sessionId
+					gameLobby.ChallengerName = user.Name
+					gameLobby.Status = "full"
+					bytes, err := json.Marshal(gameLobby)
+					if err != nil {
+						http.Error(w, fmt.Sprintf("failed to marshal mvc: %v", err), http.StatusInternalServerError)
+						return
+					}
+					_, err = gameLobbiesKV.Put(r.Context(), id, bytes)
+					if err != nil {
+						http.Error(w, fmt.Sprintf("failed to put key value: %v", err), http.StatusInternalServerError)
+						return
+					}
+				}
+				sse.Redirect("/game/" + id)
 			})
 
 			gameIdRouter.Delete("/delete", func(w http.ResponseWriter, r *http.Request) {
 				ctx := r.Context()
 
-				// Extract the "id" parameter from the URL
 				id := chi.URLParam(r, "id")
 				if id == "" {
 					http.Error(w, "missing 'id' parameter", http.StatusBadRequest)
 					return
 				}
-				log.Printf("id: %s", id)
 
 				if err := gameLobbiesKV.Delete(ctx, id); err != nil {
-					http.Error(w, fmt.Sprintf("failed to delete key '%s': %v", id, err), http.StatusInternalServerError)
-					return
-				}
-
-				if err := gameBoardsKV.Delete(ctx, id); err != nil {
 					http.Error(w, fmt.Sprintf("failed to delete key '%s': %v", id, err), http.StatusInternalServerError)
 					return
 				}
@@ -132,11 +145,20 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 				return
 			}
 
-			// Set User
+			user, _, err := GetObject[components.User](r.Context(), usersKV, sessionId)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("failed to get user: %v", err), http.StatusInternalServerError)
+				return
+			}
 
 			id := toolbelt.NextEncodedID()
 			gameLobby := components.GameLobby{
-				Id: id,
+				Id:             id,
+				HostId:         sessionId,
+				HostName:       user.Name,
+				ChallengerId:   "",
+				ChallengerName: "",
+				Status:         "created",
 			}
 			bytes, err := json.Marshal(gameLobby)
 			if err != nil {
@@ -149,14 +171,13 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 				return
 			}
 
-			gameboard := components.GameState{
-				Id:             id,
-				HostId:         sessionId,
-				HostName:       user.Name,
-				ChallengerId:   "",
-				ChallengerName: "",
+			gameState := components.GameState{
+				Id:      id,
+				Board:   [9]string{},
+				XIsNext: true,
+				Winner:  "",
 			}
-			bytes, err = json.Marshal(gameboard)
+			bytes, err = json.Marshal(gameState)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to marshal mvc: %v", err), http.StatusInternalServerError)
 				return
@@ -170,7 +191,6 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 
 		dashboardRouter.Get("/watch", func(w http.ResponseWriter, r *http.Request) {
 			sse := datastar.NewSSE(w, r)
-
 			sessionId, err := getSessionId(store, r)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -196,8 +216,6 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 					continue
 				}
 
-				log.Printf("Received update: %s", update.Value())
-
 				switch update.Operation() {
 				case jetstream.KeyValuePut:
 
@@ -207,23 +225,79 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 						return
 					}
 
-					entry, err := gameBoardsKV.Get(ctx, gameLobby.Id)
-					if err != nil {
-						log.Printf("Failed to get game state for key %s: %v", gameLobby.Id, err)
-						continue
-					}
-					gameState := &components.GameState{}
-					if err := json.Unmarshal(entry.Value(), gameState); err != nil {
-						http.Error(w, fmt.Errorf("error unmarshalling user: %w", err).Error(), http.StatusInternalServerError)
-						return
-					}
+					c := components.DashboardItem(&gameLobby, sessionId)
 
-					c := components.DashboardItem(gameState, sessionId)
-					if err := sse.MergeFragmentTempl(c,
-						datastar.WithSelectorID("list-container"),
-						datastar.WithMergeAppend(),
-					); err != nil {
-						sse.ConsoleError(err)
+					if historicalMode {
+
+						sse.RemoveFragments("#game-"+update.Key(),
+							datastar.WithRemoveSettleDuration(1*time.Millisecond),
+							datastar.WithRemoveUseViewTransitions(false),
+						)
+
+						if err := sse.MergeFragmentTempl(c,
+							datastar.WithSelectorID("list-container"),
+							datastar.WithMergeAppend(),
+						); err != nil {
+							sse.ConsoleError(err)
+						}
+
+					} else { // if live mode
+
+						if gameLobby.Status == "created" {
+							if err := sse.MergeFragmentTempl(c,
+								datastar.WithSelectorID("list-container"),
+								datastar.WithMergeAppend(),
+							); err != nil {
+								sse.ConsoleError(err)
+							}
+						} else if gameLobby.Status == "open" {
+
+							if gameLobby.HostId == sessionId {
+								if err := sse.MergeFragmentTempl(c,
+									datastar.WithSelectorID("game-"+update.Key()),
+									datastar.WithMergeMorph(),
+								); err != nil {
+									sse.ConsoleError(err)
+								}
+							} else if gameLobby.ChallengerId == sessionId {
+								if err := sse.MergeFragmentTempl(c,
+									datastar.WithSelectorID("game-"+update.Key()),
+									datastar.WithMergeMorph(),
+								); err != nil {
+									sse.ConsoleError(err)
+								}
+							} else {
+								if err := sse.MergeFragmentTempl(c,
+									datastar.WithSelectorID("list-container"),
+									datastar.WithMergeAppend(),
+								); err != nil {
+									sse.ConsoleError(err)
+								}
+							}
+
+						} else if gameLobby.Status == "full" {
+
+							if gameLobby.HostId == sessionId {
+								if err := sse.MergeFragmentTempl(c,
+									datastar.WithSelectorID("game-"+update.Key()),
+									datastar.WithMergeMorph(),
+								); err != nil {
+									sse.ConsoleError(err)
+								}
+							} else if gameLobby.ChallengerId == sessionId {
+								if err := sse.MergeFragmentTempl(c,
+									datastar.WithSelectorID("game-"+update.Key()),
+									datastar.WithMergeMorph(),
+								); err != nil {
+									sse.ConsoleError(err)
+								}
+							} else {
+								sse.RemoveFragments("#game-"+update.Key(),
+									datastar.WithRemoveSettleDuration(1*time.Millisecond),
+									datastar.WithRemoveUseViewTransitions(true),
+								)
+							}
+						}
 					}
 
 				case jetstream.KeyValueDelete:
@@ -233,14 +307,13 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 						continue
 					}
 
-					if err := sse.RemoveFragments("#game-"+update.Key(),
+					sse.RemoveFragments("#game-"+update.Key(),
 						datastar.WithRemoveSettleDuration(1*time.Millisecond),
-						datastar.WithRemoveUseViewTransitions(true),
-					); err != nil {
-						sse.ConsoleError(err)
-					}
+						datastar.WithRemoveUseViewTransitions(false),
+					)
 
 				}
+
 			}
 
 		})
@@ -262,19 +335,19 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 			}
 
 			for _, key := range keys {
-				entry, err := gameBoardsKV.Get(context.Background(), key)
+				entry, err := gameLobbiesKV.Get(context.Background(), key)
 				if err != nil {
 					log.Printf("Failed to get value for key %s: %v", key, err)
 					continue
 				}
 
-				var gameState components.GameState
-				if err := json.Unmarshal(entry.Value(), &gameState); err != nil {
+				var gameLobby components.GameLobby
+				if err := json.Unmarshal(entry.Value(), &gameLobby); err != nil {
 					log.Printf("Error unmarshalling update value: %v", err)
 					return
 				}
 
-				if gameState.HostId == sessionId {
+				if gameLobby.HostId == sessionId {
 					gameLobbiesKV.Delete(ctx, key)
 					gameBoardsKV.Delete(ctx, key)
 				}
