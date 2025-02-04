@@ -54,7 +54,7 @@ func Game(gameLobby *components.GameLobby, gameState *components.GameState, sess
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 1)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<!-- Full-Screen Container --> <div class=\"flex flex-col min-h-screen max-h-screen overflow-hidden\"><!-- Navigation Bar --><nav class=\"bg-base-300 text-base-content py-4 shadow-lg\"><div class=\"container mx-auto flex items-center justify-between px-6\"><!-- Left: Game Title --><div class=\"text-xl sm:text-2xl font-extrabold tracking-widest uppercase text-secondary-content\">Tic Tac Toe</div></div></nav><!-- Main Content --><main id=\"main-container\" class=\"flex flex-col flex-grow w-full p-4 h-screen\"><!-- Game Header --><div class=\"flex flex-col sm:flex-row justify-between items-center p-4 bg-accent shadow-md w-full gap-3\"><!-- Game Info --><div class=\"text-sm sm:text-lg font-bold text-secondary-content text-center\">Game: ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -67,7 +67,7 @@ func Game(gameLobby *components.GameLobby, gameState *components.GameState, sess
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 2)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div><div class=\"text-sm sm:text-lg font-bold text-secondary-content text-center\">Host: ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -80,17 +80,17 @@ func Game(gameLobby *components.GameLobby, gameState *components.GameState, sess
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 3)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div><!-- Navigation Buttons --><div class=\"flex flex-col sm:flex-row gap-3 w-full sm:w-auto\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if sessionId == gameLobby.HostId {
-				templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 4)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<a class=\"btn btn-secondary rounded-none w-full sm:w-auto text-center\" href=\"/dashboard\">Back to Dashboard</a>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 5)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<button class=\"btn btn-secondary rounded-none w-full sm:w-auto text-center\" data-on-click=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -103,12 +103,12 @@ func Game(gameLobby *components.GameLobby, gameState *components.GameState, sess
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 6)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\">Leave Game</button>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 7)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div></div><!-- Game Board --><div class=\"flex flex-grow items-center justify-center bg-base-300 mt-2 overflow-y-auto max-h-[75vh] w-full\" data-on-load=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -121,7 +121,7 @@ func Game(gameLobby *components.GameLobby, gameState *components.GameState, sess
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 8)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -129,7 +129,7 @@ func Game(gameLobby *components.GameLobby, gameState *components.GameState, sess
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 9)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div></main></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
