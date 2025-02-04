@@ -17,35 +17,31 @@ templ Dashboard(name string) {
 						Tic Tac Toe
 					</div>
 					<!-- Center: Welcome Message -->
-					<h1 class="text-xl font-semibold text-primary-content text-center flex-1">
+					<h1 class="text-base sm:text-xl font-semibold text-primary-content text-center flex-1">
 						Welcome, { name }
 					</h1>
 				</div>
 			</nav>
 			<!-- Main Content -->
 			<main class="flex flex-col flex-grow w-full p-4 overflow-hidden">
-				<div class="flex justify-between items-center p-4 bg-accent shadow-md w-full mb-4">
-					<!-- Left: Active Games Title -->
-					<h2 class="text-lg font-bold text-base-content tracking-wide">
-						Active Games
-					</h2>
-					<!-- Right: Button Group -->
-					<div class="flex gap-3">
+				<!-- Title and Buttons Section -->
+				<div class="flex flex-col sm:flex-row justify-between items-center p-4 bg-accent shadow-md w-full mb-4">
+					<div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
 						<button
-							class="btn btn-primary rounded-none flex items-center justify-center text-center text-primary-content"
+							class="btn btn-primary rounded-none flex items-center justify-center text-center text-primary-content px-4 py-2 sm:px-6 sm:py-3 w-full sm:w-auto"
 							data-on-click={ datastar.PostSSE("/api/dashboard/create") }
 						>
 							Create Game
 						</button>
 						<button
-							class="btn btn-secondary rounded-none px-6 py-3 text-secondary-content"
+							class="btn btn-secondary rounded-none px-4 py-2 sm:px-6 sm:py-3 text-secondary-content w-full sm:w-auto"
 							data-on-click={ datastar.PostSSE("/api/dashboard/logout") }
 						>
 							Logout
 						</button>
 						if (name == "admin") {
 							<button
-								class="btn btn-error rounded-none flex items-center justify-center text-center text-error-content"
+								class="btn btn-error rounded-none flex items-center justify-center text-center text-error-content px-4 py-2 sm:px-6 sm:py-3 w-full sm:w-auto"
 								data-on-click={ datastar.DeleteSSE("/api/dashboard/purge") }
 							>
 								Delete Games
@@ -53,9 +49,8 @@ templ Dashboard(name string) {
 						}
 					</div>
 				</div>
-				<div
-					data-on-load={ datastar.GetSSE("/api/dashboard/watch") }
-				></div>
+				<!-- Game List -->
+				<div data-on-load={ datastar.GetSSE("/api/dashboard/watch") }></div>
 				<div
 					id="list-container"
 					class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full overflow-y-auto"

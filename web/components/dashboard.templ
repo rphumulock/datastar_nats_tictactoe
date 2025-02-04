@@ -10,48 +10,36 @@ templ DashboardItem(gameLobby *GameLobby, sessionId string) {
 		isHost := gameLobby.HostId == sessionId
 		selector := fmt.Sprintf("game-%s", gameLobby.Id)
 	}}
-	<div id={ selector } class="p-6 bg-base-300 text-base-content shadow-lg flex flex-col items-center justify-between w-full min-h-[220px]">
-		<!-- Game ID -->
-		<h6 class="tracking-widest text-secondary-content text-lg font-bold">
+	<!-- Game Card -->
+	<div id={ selector } class="p-6 bg-base-300 text-base-content shadow-lg flex flex-col items-center justify-between w-full min-h-[220px] rounded-none">
+		<!-- Game ID & Host -->
+		<h6 class="tracking-widest text-secondary-content text-base sm:text-lg font-bold text-center">
 			Game: { gameLobby.Id }
 		</h6>
-		<h6 class="tracking-widest text-secondary-content text-lg font-bold">
+		<h6 class="tracking-widest text-secondary-content text-base sm:text-lg font-bold text-center">
 			Hosted By: { gameLobby.HostName }
 		</h6>
-		<p>
+		<p class="text-center text-sm sm:text-md">
 			Status: { gameLobby.Status }
 		</p>
-		<!-- Status Message (Ensures Equal Space) -->
-		<div class="flex-grow flex flex-col items-center justify-center w-full">
+		<!-- Buttons Section -->
+		<div class="flex flex-col items-center justify-center w-full gap-2">
+			<!-- Join Button -->
 			<button
-				class="btn btn-primary rounded-none flex items-center justify-center text-center text-primary-content w-full m-2 h-12"
+				class="btn btn-primary rounded-none flex items-center justify-center text-center text-primary-content w-full m-2 h-12 px-4"
 				data-on-click={ datastar.PostSSE("/api/dashboard/%s/join", gameLobby.Id) }
 			>
 				Join
 			</button>
-		</div>
-		<!-- Delete Button (if Host) -->
-		<div class="h-12 w-full">
+			<!-- Delete Button (Only for Host) -->
 			if isHost {
 				<button
-					class="btn btn-secondary rounded-none flex items-center justify-center text-center text-secondary-content w-full m-2 h-12"
+					class="btn btn-secondary rounded-none flex items-center justify-center text-center text-secondary-content w-full m-2 h-12 px-4"
 					data-on-click={ datastar.DeleteSSE("/api/dashboard/%s/delete", gameLobby.Id) }
 				>
 					Delete
 				</button>
 			}
 		</div>
-	</div>
-}
-
-templ DashboardList(list []templ.Component) {
-	<div
-		id="list-container"
-		class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full overflow-y-auto"
-		style="max-height: 75vh;"
-	>
-		for _, item := range list {
-			@item
-		}
 	</div>
 }

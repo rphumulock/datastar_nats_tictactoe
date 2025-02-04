@@ -11,7 +11,7 @@ templ inlineValidationFieldComponent(label, field string, isValid bool, isNotVal
 			<span class="label-text">{ label }</span>
 		</label>
 		<input
-			class={ "input input-bordered text-accent", templ.KV("input-error", !isValid) }
+			class={ "input input-bordered text-accent rounded-none", templ.KV("input-error", !isValid) }
 			data-bind={ field }
 			data-on-keydown__debounce.500ms={ datastar.GetSSE("/api/index") }
 		/>
