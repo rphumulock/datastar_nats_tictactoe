@@ -43,12 +43,14 @@ templ Dashboard(name string) {
 						>
 							Logout
 						</button>
-						<button
-							class="btn btn-error rounded-none flex items-center justify-center text-center text-error-content"
-							data-on-click={ datastar.DeleteSSE("/api/dashboard/purge") }
-						>
-							Delete Games
-						</button>
+						if (name == "admin") {
+							<button
+								class="btn btn-error rounded-none flex items-center justify-center text-center text-error-content"
+								data-on-click={ datastar.DeleteSSE("/api/dashboard/purge") }
+							>
+								Delete Games
+							</button>
+						}
 					</div>
 				</div>
 				<div

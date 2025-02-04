@@ -1,11 +1,20 @@
 package pages
 
 import (
+	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
 	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-templ Game(id string) {
+templ Game(gameLobby *components.GameLobby, gameState *components.GameState, sessionId string) {
+	{{
+		var host string
+		if gameLobby.HostId == sessionId {
+			host = "You!"
+		} else {
+			host = gameLobby.HostName
+		}
+	}}
 	@layouts.Base() {
 		<div class="flex flex-col min-h-screen max-h-screen overflow-hidden">
 			<!-- Navigation Bar -->
@@ -17,7 +26,28 @@ templ Game(id string) {
 					</div>
 				</div>
 			</nav>
-			<main id="main-container" class="flex flex-col flex-grow w-full p-4 overflow-hidden" data-on-load={ datastar.GetSSE("/api/game/%s/", id) }></main>
+			<main id="main-container" class="flex flex-col flex-grow w-full p-4 h-screen">
+				<!-- Game Header -->
+				<div class="flex justify-between items-center p-4 bg-accent shadow-md w-full">
+					<div class="text-lg font-bold text-secondary-content">Game: { gameLobby.Id }</div>
+					<div class="text-lg font-bold text-secondary-content">Host: { host }</div>
+					<div class="text-lg font-bold text-secondary-content">
+						if (sessionId == gameLobby.HostId) {
+							<a class="btn btn-secondary rounded-none" href="/dashboard">Back to Dashboard</a>
+						} else {
+							<button class="btn btn-secondary rounded-none" data-on-click={ datastar.PostSSE("/api/game/%s/leave", gameLobby.Id) }>
+								Leave Game
+							</button>
+						}
+					</div>
+				</div>
+				<div
+					class="flex flex-grow items-center justify-center bg-base-300 mt-2 overflow-y-auto max-h-[75vh] w-full"
+					data-on-load={ datastar.GetSSE("/api/game/%s/watch", gameLobby.Id) }
+				>
+					@components.GameBoard(gameState, gameLobby, sessionId)
+				</div>
+			</main>
 		</div>
 	}
 }
