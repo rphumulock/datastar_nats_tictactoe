@@ -134,6 +134,10 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 					http.Error(w, fmt.Sprintf("failed to delete key '%s': %v", id, err), http.StatusInternalServerError)
 					return
 				}
+				if err := gameBoardsKV.Delete(ctx, id); err != nil {
+					http.Error(w, fmt.Sprintf("failed to delete key '%s': %v", id, err), http.StatusInternalServerError)
+					return
+				}
 			})
 
 		})
