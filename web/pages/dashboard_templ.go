@@ -46,7 +46,7 @@ func Dashboard(name string) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 1)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<!-- Full-Screen Container --> <div class=\"flex flex-col min-h-screen max-h-screen overflow-hidden\"><!-- Navigation Bar --><nav class=\"bg-base-300 text-base-content py-4 shadow-lg\"><div class=\"container mx-auto flex items-center justify-between px-6\"><!-- Left: Game Title --><div class=\"text-2xl font-extrabold tracking-widest uppercase text-secondary-content\">Tic Tac Toe</div><!-- Center: Welcome Message --><h1 class=\"text-xl font-semibold text-primary-content text-center flex-1\">Welcome, ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -59,7 +59,7 @@ func Dashboard(name string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 2)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</h1></div></nav><!-- Main Content --><main class=\"flex flex-col flex-grow w-full p-4 overflow-hidden\"><div class=\"flex justify-between items-center p-4 bg-accent shadow-md w-full mb-4\"><!-- Left: Active Games Title --><h2 class=\"text-lg font-bold text-base-content tracking-wide\">Active Games</h2><!-- Right: Button Group --><div class=\"flex gap-3\"><button class=\"btn btn-primary rounded-none flex items-center justify-center text-center text-primary-content\" data-on-click=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -72,7 +72,7 @@ func Dashboard(name string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 3)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\">Create Game</button> <button class=\"btn btn-secondary rounded-none px-6 py-3 text-secondary-content\" data-on-click=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -85,12 +85,12 @@ func Dashboard(name string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 4)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\">Logout</button> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if name == "admin" {
-				templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 5)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<button class=\"btn btn-error rounded-none flex items-center justify-center text-center text-error-content\" data-on-click=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -103,12 +103,12 @@ func Dashboard(name string) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 6)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\">Delete Games</button>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 7)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div></div><div data-on-load=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -121,7 +121,7 @@ func Dashboard(name string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 8)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\"></div><div id=\"list-container\" class=\"grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full overflow-y-auto\" style=\"max-height: 75vh;\"></div></main></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
