@@ -244,6 +244,7 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				}
 
 				gameLobby.ChallengerId = ""
+				gameLobby.ChallengerName = ""
 				gameLobby.Status = "open"
 				data, err := json.Marshal(gameLobby)
 				if err != nil {

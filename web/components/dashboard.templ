@@ -8,19 +8,46 @@ import (
 templ DashboardItem(gameLobby *GameLobby, sessionId string) {
 	{{
 		isHost := gameLobby.HostId == sessionId
+		hasChallenger := gameLobby.ChallengerId != ""
 		selector := fmt.Sprintf("game-%s", gameLobby.Id)
+		var status string
+		if gameLobby.Status == "open" || gameLobby.Status == "created" {
+			status = "Waiting for Challenger..."
+		} else {
+			status = "Challenger Waiting!"
+		}
+
+		// Decide which color classes to use
+		colorClass := "bg-base-300 text-base-content"
+		if isHost {
+			colorClass = "bg-base-100 text-primary-content"
+		}
+
+		// Common card classes
+		baseClasses := "p-6 shadow-lg flex flex-col items-center justify-between w-full min-h-[220px] rounded-none"
+		cardClasses := baseClasses + " " + colorClass
 	}}
 	<!-- Game Card -->
-	<div id={ selector } class="p-6 bg-base-300 text-base-content shadow-lg flex flex-col items-center justify-between w-full min-h-[220px] rounded-none">
+	<div id={ selector } class={ cardClasses }>
 		<!-- Game ID & Host -->
-		<h6 class="tracking-widest text-secondary-content text-base sm:text-lg font-bold text-center">
+		<p class="tracking-widest text-secondary-content text-base sm:text-md text-center">
 			Game: { gameLobby.Id }
-		</h6>
-		<h6 class="tracking-widest text-secondary-content text-base sm:text-lg font-bold text-center">
-			Hosted By: { gameLobby.HostName }
-		</h6>
-		<p class="text-center text-sm sm:text-md">
-			Status: { gameLobby.Status }
+		</p>
+		<p class="tracking-widest text-secondary-content text-base sm:text-md text-center">
+			Hosted By:
+			if isHost {
+				You!
+			} else {
+				{ gameLobby.HostName }
+			}
+		</p>
+		if hasChallenger {
+			<p class="tracking-widest text-secondary-content text-base sm:text-md text-center">
+				Challenger: { gameLobby.ChallengerName }
+			</p>
+		}
+		<p class="tracking-widest text-secondary-content text-base sm:text-md text-center">
+			Status: { status }
 		</p>
 		<!-- Buttons Section -->
 		<div class="flex flex-col items-center justify-center w-full gap-2">
