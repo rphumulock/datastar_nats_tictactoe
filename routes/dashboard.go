@@ -293,13 +293,6 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 								); err != nil {
 									sse.ConsoleError(err)
 								}
-							} else if gameLobby.ChallengerId == sessionId {
-								if err := sse.MergeFragmentTempl(c,
-									datastar.WithSelectorID("game-"+update.Key()),
-									datastar.WithMergeMorph(),
-								); err != nil {
-									sse.ConsoleError(err)
-								}
 							} else {
 								if err := sse.MergeFragmentTempl(c,
 									datastar.WithSelectorID("game-"+update.Key()),
@@ -318,18 +311,13 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 								); err != nil {
 									sse.ConsoleError(err)
 								}
-							} else if gameLobby.ChallengerId == sessionId {
+							} else {
 								if err := sse.MergeFragmentTempl(c,
 									datastar.WithSelectorID("game-"+update.Key()),
 									datastar.WithMergeMorph(),
 								); err != nil {
 									sse.ConsoleError(err)
 								}
-							} else {
-								sse.RemoveFragments("#game-"+update.Key(),
-									datastar.WithRemoveSettleDuration(1*time.Millisecond),
-									datastar.WithRemoveUseViewTransitions(true),
-								)
 							}
 						}
 					}

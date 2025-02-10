@@ -8,42 +8,59 @@ import (
 
 templ DashboardItem(gameLobby *GameLobby, sessionId string) {
 	{{
+	// Determine roles
 	isHost := gameLobby.HostId == sessionId
+	isChallenger := gameLobby.ChallengerId == sessionId
 	hasChallenger := gameLobby.ChallengerId != ""
+	isParticipant := isHost || isChallenger
+
+	// Unique ID for this game's DOM element
 	gameSelector := fmt.Sprintf("game-%s", gameLobby.Id)
 
+	// Decide the status message
 	var status string
-	switch {
-	case isHost && (gameLobby.Status == "open" || gameLobby.Status == "created"):
+	switch gameLobby.Status {
+	case "open", "created":
 		status = "Waiting for Challenger..."
-	case isHost && (gameLobby.Status == "full" || gameLobby.Status == "in-progress"):
-		status = "Game is Ready!"
-	case !isHost && (gameLobby.Status == "open" || gameLobby.Status == "created"):
-		status = "Waiting for Challenger..."
-	case !isHost && (gameLobby.Status == "full" || gameLobby.Status == "in-progress"):
-		status = "Game is Full!"
+		if isHost && hasChallenger {
+			status = "Game is Ready!"
+		}
+	case "full", "in-progress":
+		if isHost {
+			status = "Game is Ready!"
+		} else {
+			status = "Game is Full!"
+		}
 	default:
 		status = "Unknown"
 	}
 
+	// Decide the color theme
 	colorClass := "bg-base-300 text-base-content"
 	if isHost {
 		colorClass = "bg-base-100 text-primary-content"
 	}
 
+	// Base card styling
 	baseClasses := "p-6 shadow-lg flex flex-col items-center justify-between w-full min-h-[220px] rounded-none"
 	cardClasses := baseClasses + " " + colorClass
 
+	// Show the "Join" button if...
+	// 1) The game is open/created (anyone can join), OR
+	// 2) The user is a participant (host/challenger) and the game is full/in-progress
 	showJoinButton := false
-	if (isHost && gameLobby.Status == "full") ||
-		(gameLobby.Status == "open" || gameLobby.Status == "created") {
+	if (gameLobby.Status == "open" || gameLobby.Status == "created") ||
+		(isParticipant && (gameLobby.Status == "full" || gameLobby.Status == "in-progress")) {
 		showJoinButton = true
 	}
 	}}
+	<!-- Game Card -->
 	<div id={ gameSelector } class={ cardClasses }>
+		<!-- Game ID -->
 		<p class="tracking-widest text-secondary-content sm:text-md text-center">
 			Game: { gameLobby.Id }
 		</p>
+		<!-- Host -->
 		<p class="tracking-widest text-secondary-content sm:text-md text-center">
 			Hosted By:
 			if isHost {
@@ -52,14 +69,17 @@ templ DashboardItem(gameLobby *GameLobby, sessionId string) {
 				{ gameLobby.HostName }
 			}
 		</p>
+		<!-- Challenger (if any) -->
 		if hasChallenger {
 			<p class="tracking-widest text-secondary-content sm:text-md text-center">
 				Challenger: { gameLobby.ChallengerName }
 			</p>
 		}
+		<!-- Status -->
 		<p class="tracking-widest text-secondary-content sm:text-md text-center">
 			Status: { status }
 		</p>
+		<!-- Buttons Section -->
 		<div class="flex flex-col items-center justify-center w-full gap-2">
 			if showJoinButton {
 				<button

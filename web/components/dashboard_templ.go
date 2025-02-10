@@ -36,56 +36,74 @@ func DashboardItem(gameLobby *GameLobby, sessionId string) templ.Component {
 		}
 		ctx = templ.ClearChildren(ctx)
 
+		// Determine roles
 		isHost := gameLobby.HostId == sessionId
+		isChallenger := gameLobby.ChallengerId == sessionId
 		hasChallenger := gameLobby.ChallengerId != ""
+		isParticipant := isHost || isChallenger
+
+		// Unique ID for this game's DOM element
 		gameSelector := fmt.Sprintf("game-%s", gameLobby.Id)
 
+		// Decide the status message
 		var status string
-		switch {
-		case isHost && (gameLobby.Status == "open" || gameLobby.Status == "created"):
+		switch gameLobby.Status {
+		case "open", "created":
 			status = "Waiting for Challenger..."
-		case isHost && (gameLobby.Status == "full" || gameLobby.Status == "in-progress"):
-			status = "Game is Ready!"
-		case !isHost && (gameLobby.Status == "open" || gameLobby.Status == "created"):
-			status = "Waiting for Challenger..."
-		case !isHost && (gameLobby.Status == "full" || gameLobby.Status == "in-progress"):
-			status = "Game is Full!"
+			if isHost && hasChallenger {
+				status = "Game is Ready!"
+			}
+		case "full", "in-progress":
+			if isHost {
+				status = "Game is Ready!"
+			} else {
+				status = "Game is Full!"
+			}
 		default:
 			status = "Unknown"
 		}
 
+		// Decide the color theme
 		colorClass := "bg-base-300 text-base-content"
 		if isHost {
 			colorClass = "bg-base-100 text-primary-content"
 		}
 
+		// Base card styling
 		baseClasses := "p-6 shadow-lg flex flex-col items-center justify-between w-full min-h-[220px] rounded-none"
 		cardClasses := baseClasses + " " + colorClass
 
+		// Show the "Join" button if...
+		// 1) The game is open/created (anyone can join), OR
+		// 2) The user is a participant (host/challenger) and the game is full/in-progress
 		showJoinButton := false
-		if (isHost && gameLobby.Status == "full") ||
-			(gameLobby.Status == "open" || gameLobby.Status == "created") {
+		if (gameLobby.Status == "open" || gameLobby.Status == "created") ||
+			(isParticipant && (gameLobby.Status == "full" || gameLobby.Status == "in-progress")) {
 			showJoinButton = true
+		}
+		templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 1)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 = []any{cardClasses}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div id=\"")
+		templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 2)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(gameSelector)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/dashboard.templ`, Line: 43, Col: 23}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/dashboard.templ`, Line: 58, Col: 23}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\" class=\"")
+		templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 3)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -98,25 +116,25 @@ func DashboardItem(gameLobby *GameLobby, sessionId string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\"><p class=\"tracking-widest text-secondary-content sm:text-md text-center\">Game: ")
+		templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 4)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(gameLobby.Id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/dashboard.templ`, Line: 45, Col: 23}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/dashboard.templ`, Line: 61, Col: 23}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</p><p class=\"tracking-widest text-secondary-content sm:text-md text-center\">Hosted By: ")
+		templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 5)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if isHost {
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("You!")
+			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 6)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -124,92 +142,92 @@ func DashboardItem(gameLobby *GameLobby, sessionId string) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(gameLobby.HostName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/dashboard.templ`, Line: 52, Col: 24}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/dashboard.templ`, Line: 69, Col: 24}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</p>")
+		templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 7)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if hasChallenger {
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<p class=\"tracking-widest text-secondary-content sm:text-md text-center\">Challenger: ")
+			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 8)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(gameLobby.ChallengerName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/dashboard.templ`, Line: 57, Col: 42}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/dashboard.templ`, Line: 75, Col: 42}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</p>")
+			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 9)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<p class=\"tracking-widest text-secondary-content sm:text-md text-center\">Status: ")
+		templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 10)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(status)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/dashboard.templ`, Line: 61, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/dashboard.templ`, Line: 80, Col: 19}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</p><div class=\"flex flex-col items-center justify-center w-full gap-2\">")
+		templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 11)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if showJoinButton {
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<button class=\"btn btn-primary rounded-none flex items-center justify-center text-center text-primary-content w-full m-2 h-12 px-4\" data-on-click=\"")
+			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 12)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.PostSSE("/api/dashboard/%s/join", gameLobby.Id))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/dashboard.templ`, Line: 67, Col: 77}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/dashboard.templ`, Line: 87, Col: 77}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\">Join</button> ")
+			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 13)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if isHost {
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<button class=\"btn btn-secondary rounded-none flex items-center justify-center text-center text-secondary-content w-full m-2 h-12 px-4\" data-on-click=\"")
+			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 14)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.DeleteSSE("/api/dashboard/%s/delete", gameLobby.Id))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/dashboard.templ`, Line: 75, Col: 81}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/components/dashboard.templ`, Line: 95, Col: 81}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\">Delete</button>")
+			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 15)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div></div>")
+		templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 16)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
