@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"net/http"
 	"time"
 
-	"github.com/delaneyj/toolbelt"
 	"github.com/delaneyj/toolbelt/embeddednats"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
@@ -53,6 +51,33 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 		return nil, err
 	}
 
+	createKeyValueBuckets := func(ctx context.Context, js jetstream.JetStream) error {
+		createBucket := func(bucket, desc string) error {
+			_, err := js.CreateOrUpdateKeyValue(ctx, jetstream.KeyValueConfig{
+				Bucket:      bucket,
+				Description: desc,
+				Compression: true,
+				TTL:         time.Hour,
+				MaxBytes:    16 * 1024 * 1024,
+			})
+			if err != nil {
+				return fmt.Errorf("error creating bucket %q: %w", bucket, err)
+			}
+			return nil
+		}
+
+		if err := createBucket("gameLobbies", "Datastar Tic Tac Toe Game"); err != nil {
+			return err
+		}
+		if err := createBucket("gameBoards", "Datastar Tic Tac Toe Game"); err != nil {
+			return err
+		}
+		if err := createBucket("users", "Datastar Tic Tac Toe Game"); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	if err := createKeyValueBuckets(ctx, js); err != nil {
 		return cleanup, err
 	}
@@ -66,69 +91,4 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 	}
 
 	return cleanup, nil
-}
-
-func createSessionId(store sessions.Store, r *http.Request, w http.ResponseWriter) (string, error) {
-	sess, err := store.Get(r, "connections")
-	if err != nil {
-		return "", fmt.Errorf("failed to get session: %w", err)
-	}
-	id := toolbelt.NextEncodedID()
-	sess.Values["id"] = id
-	if err := sess.Save(r, w); err != nil {
-		return "", fmt.Errorf("failed to save session: %w", err)
-	}
-	return id, nil
-}
-
-func getSessionId(store sessions.Store, r *http.Request) (string, error) {
-	sess, err := store.Get(r, "connections")
-	if err != nil {
-		return "", fmt.Errorf("failed to get session: %w", err)
-	}
-	id, ok := sess.Values["id"].(string)
-	if !ok || id == "" {
-		return "", nil
-	}
-	return id, nil
-}
-
-func deleteSessionId(store sessions.Store, w http.ResponseWriter, r *http.Request) {
-	session, err := store.Get(r, "connections")
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to get session: %v", err), http.StatusInternalServerError)
-		return
-	}
-	delete(session.Values, "id")
-	if err := session.Save(r, w); err != nil {
-		http.Error(w, fmt.Sprintf("failed to save session: %v", err), http.StatusInternalServerError)
-		return
-	}
-}
-
-func createKeyValueBuckets(ctx context.Context, js jetstream.JetStream) error {
-	createBucket := func(bucket, desc string) error {
-		_, err := js.CreateOrUpdateKeyValue(ctx, jetstream.KeyValueConfig{
-			Bucket:      bucket,
-			Description: desc,
-			Compression: true,
-			TTL:         time.Hour,
-			MaxBytes:    16 * 1024 * 1024,
-		})
-		if err != nil {
-			return fmt.Errorf("error creating bucket %q: %w", bucket, err)
-		}
-		return nil
-	}
-
-	if err := createBucket("gameLobbies", "Datastar Tic Tac Toe Game"); err != nil {
-		return err
-	}
-	if err := createBucket("gameBoards", "Datastar Tic Tac Toe Game"); err != nil {
-		return err
-	}
-	if err := createBucket("users", "Datastar Tic Tac Toe Game"); err != nil {
-		return err
-	}
-	return nil
 }

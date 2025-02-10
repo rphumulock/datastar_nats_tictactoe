@@ -39,7 +39,6 @@ templ GameWinner(sessionId string, gameState *GameState, gameLobby *GameLobby) {
 		aria-live="assertive"
 		role="dialog"
 	>
-		<!-- Winner Announcement -->
 		if (gameState.Winner == "TIE") {
 			<h1 class="text-4xl sm:text-5xl font-extrabold mb-4 animate-bounce text-center">
 				🤝 It's a Tie! 🤝
@@ -49,9 +48,7 @@ templ GameWinner(sessionId string, gameState *GameState, gameLobby *GameLobby) {
 				🎉 { gameState.Winner } Wins! 🎉
 			</h1>
 		}
-		<!-- Buttons Container -->
 		<div class="flex flex-col sm:flex-row gap-3 w-full max-w-[80%] sm:max-w-[60%] items-center justify-center">
-			<!-- Play Again Button (Only for Host) -->
 			if (sessionId == gameLobby.HostId) {
 				<button
 					class="btn btn-primary w-full sm:w-auto px-6 py-3"
@@ -60,7 +57,6 @@ templ GameWinner(sessionId string, gameState *GameState, gameLobby *GameLobby) {
 					Play Again
 				</button>
 			}
-			<!-- Back to Dashboard Button -->
 			if (sessionId == gameLobby.HostId) {
 				<a class="btn btn-secondary w-full sm:w-auto px-6 py-3" href="/">
 					Back to Dashboard
