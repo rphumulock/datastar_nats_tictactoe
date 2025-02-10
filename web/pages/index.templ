@@ -7,18 +7,14 @@ import (
 
 templ Index() {
 	@layouts.Base() {
-		<!-- Full-Screen Container -->
 		<div class="flex flex-col min-h-screen max-h-screen overflow-hidden">
-			<!-- Navigation Bar -->
 			<nav class="bg-base-300 text-base-content py-4 shadow-lg">
 				<div class="container mx-auto flex items-center justify-between px-6">
-					<!-- Left: Game Title -->
 					<div class="text-2xl font-extrabold tracking-widest uppercase text-secondary-content">
 						Tic Tac Toe
 					</div>
 				</div>
 			</nav>
-			<!-- Main Content -->
 			<main class="min-h-screen flex flex-col items-center justify-center flex-grow gap-6">
 				<div id="login" data-on-load={ datastar.GetSSE("/api/index") }></div>
 			</main>

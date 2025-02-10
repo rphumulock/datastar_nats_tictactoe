@@ -27,9 +27,7 @@ templ InlineValidationUserComponent(u *InlineValidationUser, isNameValid bool) {
 			Ready to Play?
 		</h1>
 		<div class="flex flex-col gap-4">
-			<div>
-				@inlineValidationFieldComponent("Enter Your Name:", "name", isNameValid, "Name must be at least 2 characters.")
-			</div>
+			@inlineValidationFieldComponent("Enter Your Name:", "name", isNameValid, "Name must be at least 2 characters.")
 			<button
 				disabled?={ !isNameValid }
 				class="btn btn-secondary w-full"

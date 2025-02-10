@@ -65,7 +65,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 		return inlineUser, nil
 	}
 
-	handleGetLoginPage := func(w http.ResponseWriter, r *http.Request) {
+	handleGetLoginComponent := func(w http.ResponseWriter, r *http.Request) {
 		inlineUser, err := loadInlineUser(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -76,7 +76,6 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 		isNameValid := userValidation(inlineUser)
 		sse.MergeFragmentTempl(
 			components.InlineValidationUserComponent(inlineUser, isNameValid),
-			datastar.WithSelectorID("login"),
 		)
 	}
 
@@ -111,7 +110,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 	})
 
 	router.Route("/api/index", func(indexRouter chi.Router) {
-		indexRouter.Get("/", handleGetLoginPage)
+		indexRouter.Get("/", handleGetLoginComponent)
 		indexRouter.Post("/login", handlePostLogin)
 	})
 
