@@ -44,14 +44,12 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 
 		gameLobby, _, err := GetObject[components.GameLobby](ctx, gameLobbiesKV, id)
 		if err != nil {
-			deleteSessionId(store, w, r)
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
 
 		gameState, _, err := GetObject[components.GameState](ctx, gameBoardsKV, id)
 		if err != nil {
-			deleteSessionId(store, w, r)
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
@@ -80,7 +78,6 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 
 				gameLobby, _, err := GetObject[components.GameLobby](ctx, gameLobbiesKV, id)
 				if err != nil {
-					deleteSessionId(store, w, r)
 					http.Redirect(w, r, "/", http.StatusSeeOther)
 					return
 				}

@@ -42,7 +42,7 @@ func DashboardItem(gameLobby *GameLobby, sessionId string) templ.Component {
 		if gameLobby.Status == "open" || gameLobby.Status == "created" {
 			status = "Waiting for Challenger..."
 		} else {
-			status = "Challenger Waiting!"
+			status = "Game is Full!"
 		}
 
 		// Decide which color classes to use

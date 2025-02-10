@@ -62,7 +62,7 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 
 		user, _, err := GetObject[components.User](ctx, usersKV, sessionId)
 		if err != nil {
-			deleteSessionId(store, w, r)
+			//deleteSessionId(store, w, r)
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
@@ -76,48 +76,78 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 
 			gameIdRouter.Post("/join", func(w http.ResponseWriter, r *http.Request) {
 				ctx := r.Context()
+
+				// 1. Fetch the {id} parameter
 				id := chi.URLParam(r, "id")
 				if id == "" {
 					http.Error(w, "missing 'id' parameter", http.StatusBadRequest)
 					return
 				}
 
-				sessionId, err := getSessionId(store, r)
+				// 2. Get the current user's session
+				sessionID, err := getSessionId(store, r)
 				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					http.Error(w, fmt.Sprintf("failed to get session: %v", err), http.StatusInternalServerError)
+					return
+				}
+				if sessionID == "" {
+					// No session ID, redirect or handle as you wish
+					http.Redirect(w, r, "/", http.StatusSeeOther)
 					return
 				}
 
-				user, _, err := GetObject[components.User](ctx, usersKV, sessionId)
+				// 3. Fetch the user from KV
+				user, _, err := GetObject[components.User](ctx, usersKV, sessionID)
 				if err != nil {
 					http.Error(w, fmt.Sprintf("failed to get user: %v", err), http.StatusInternalServerError)
 					return
 				}
 
-				gameLobby, _, err := GetObject[components.GameLobby](ctx, gameLobbiesKV, id)
+				// 4. Fetch the game lobby and its revision
+				gameLobby, entry, err := GetObject[components.GameLobby](ctx, gameLobbiesKV, id)
 				if err != nil {
-					deleteSessionId(store, w, r)
+					// If the lobby doesn’t exist or fails to load, handle it
+					//deleteSessionId(store, w, r)
 					http.Redirect(w, r, "/", http.StatusSeeOther)
 					return
 				}
 
 				sse := datastar.NewSSE(w, r)
-				if sessionId != gameLobby.HostId {
 
-					gameLobby.ChallengerId = sessionId
-					gameLobby.ChallengerName = user.Name
-					gameLobby.Status = "full"
-					bytes, err := json.Marshal(gameLobby)
-					if err != nil {
-						http.Error(w, fmt.Sprintf("failed to marshal mvc: %v", err), http.StatusInternalServerError)
+				// 5. If this user is NOT the host, try to join as challenger
+				if sessionID != gameLobby.HostId {
+
+					// Optional: if you want to refuse re-joins once there's a challenger
+					if gameLobby.ChallengerId != "" && gameLobby.ChallengerId != sessionID {
+						sse.ExecuteScript("alert('Another player has already joined. Game is full.');")
+						sse.Redirect("/dashboard")
 						return
 					}
-					_, err = gameLobbiesKV.Put(r.Context(), id, bytes)
+
+					// 6. Make a copy of the lobby and update relevant fields
+					updatedLobby := *gameLobby
+					updatedLobby.ChallengerId = sessionID
+					updatedLobby.ChallengerName = user.Name
+					updatedLobby.Status = "full"
+
+					// 7. Marshal the updated lobby
+					updatedBytes, err := json.Marshal(updatedLobby)
 					if err != nil {
-						http.Error(w, fmt.Sprintf("failed to put key value: %v", err), http.StatusInternalServerError)
+						http.Error(w, fmt.Sprintf("failed to marshal updated lobby: %v", err), http.StatusInternalServerError)
+						return
+					}
+
+					// 8. Perform an atomic update using the old revision.
+					//    If the revision has changed, JetStream returns ErrUpdateConflict.
+					_, err = gameLobbiesKV.Update(ctx, id, updatedBytes, entry.Revision())
+					if err != nil {
+						sse.ExecuteScript("alert('Someone else joined first. This lobby is now full.');")
+						sse.Redirect("/dashboard")
 						return
 					}
 				}
+
+				// 9. Redirect to the game page if all went well
 				sse.Redirect("/game/" + id)
 			})
 
@@ -272,8 +302,8 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 								}
 							} else {
 								if err := sse.MergeFragmentTempl(c,
-									datastar.WithSelectorID("list-container"),
-									datastar.WithMergeAppend(),
+									datastar.WithSelectorID("game-"+update.Key()),
+									datastar.WithMergeMorph(),
 								); err != nil {
 									sse.ConsoleError(err)
 								}
@@ -361,7 +391,7 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 				http.Error(w, fmt.Sprintf("failed to delete key '%s': %v", sessionId, err), http.StatusInternalServerError)
 				return
 			}
-			deleteSessionId(store, w, r)
+			//deleteSessionId(store, w, r)
 			sse := datastar.NewSSE(w, r)
 			sse.Redirect("/")
 		})
