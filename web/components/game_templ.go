@@ -93,7 +93,7 @@ func Cell(id string, cell string, i int, gameState *GameState, sessionId string)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\" class=\"w-full h-full bg-accent border-base-content border-4 flex items-center justify-center text-5xl text-accent-content font-bold cursor-pointer aspect-square transition-all duration-300\" data-on-click=\"")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\" class=\"w-full h-full bg-secondary border-base-content border-4 flex items-center justify-center text-5xl text-secondary-content font-bold cursor-pointer aspect-square transition-all duration-300\" data-on-click=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -191,7 +191,7 @@ func GameWinner(sessionId string, gameState *GameState, gameLobby *GameLobby) te
 			return templ_7745c5c3_Err
 		}
 		if sessionId == gameLobby.HostId {
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<button class=\"btn btn-primary text-lg w-full sm:w-auto px-6 py-3\" data-on-click=\"")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<button class=\"btn btn-primary w-full sm:w-auto px-6 py-3\" data-on-click=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -214,12 +214,12 @@ func GameWinner(sessionId string, gameState *GameState, gameLobby *GameLobby) te
 			return templ_7745c5c3_Err
 		}
 		if sessionId == gameLobby.HostId {
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<a class=\"btn btn-secondary text-lg w-full sm:w-auto px-6 py-3\" href=\"/\">Back to Dashboard</a>")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<a class=\"btn btn-secondary w-full sm:w-auto px-6 py-3\" href=\"/\">Back to Dashboard</a>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<button class=\"btn btn-secondary text-lg w-full sm:w-auto px-6 py-3\" data-on-click=\"")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<button class=\"btn btn-secondary w-full sm:w-auto px-6 py-3\" data-on-click=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

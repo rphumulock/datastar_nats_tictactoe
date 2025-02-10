@@ -391,7 +391,7 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 				http.Error(w, fmt.Sprintf("failed to delete key '%s': %v", sessionId, err), http.StatusInternalServerError)
 				return
 			}
-			//deleteSessionId(store, w, r)
+			deleteSessionId(store, w, r)
 			sse := datastar.NewSSE(w, r)
 			sse.Redirect("/")
 		})

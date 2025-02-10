@@ -23,7 +23,7 @@ templ GameBoard(gameState *GameState, gameLobby *GameLobby, sessionId string) {
 templ Cell(id string, cell string, i int, gameState *GameState, sessionId string) {
 	<button
 		id={ "cell-" + fmt.Sprintf("%d", i) }
-		class="w-full h-full bg-accent border-base-content border-4 flex items-center justify-center text-5xl text-accent-content font-bold cursor-pointer aspect-square transition-all duration-300"
+		class="w-full h-full bg-secondary border-base-content border-4 flex items-center justify-center text-5xl text-secondary-content font-bold cursor-pointer aspect-square transition-all duration-300"
 		data-on-click={ datastar.PostSSE("/api/game/%s/toggle/%d", id, i) }
 		if cell != "" {
 			disabled
@@ -54,7 +54,7 @@ templ GameWinner(sessionId string, gameState *GameState, gameLobby *GameLobby) {
 			<!-- Play Again Button (Only for Host) -->
 			if (sessionId == gameLobby.HostId) {
 				<button
-					class="btn btn-primary text-lg w-full sm:w-auto px-6 py-3"
+					class="btn btn-primary w-full sm:w-auto px-6 py-3"
 					data-on-click={ datastar.PostSSE("/api/game/%s/reset", gameState.Id) }
 				>
 					Play Again
@@ -62,12 +62,12 @@ templ GameWinner(sessionId string, gameState *GameState, gameLobby *GameLobby) {
 			}
 			<!-- Back to Dashboard Button -->
 			if (sessionId == gameLobby.HostId) {
-				<a class="btn btn-secondary text-lg w-full sm:w-auto px-6 py-3" href="/">
+				<a class="btn btn-secondary w-full sm:w-auto px-6 py-3" href="/">
 					Back to Dashboard
 				</a>
 			} else {
 				<button
-					class="btn btn-secondary text-lg w-full sm:w-auto px-6 py-3"
+					class="btn btn-secondary w-full sm:w-auto px-6 py-3"
 					data-on-click={ datastar.PostSSE("/api/game/%s/leave", gameState.Id) }
 				>
 					Back to Dashboard

@@ -1,39 +1,50 @@
-package components 
+package components
 
 import (
 	"fmt"
+
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
 templ DashboardItem(gameLobby *GameLobby, sessionId string) {
 	{{
-		isHost := gameLobby.HostId == sessionId
-		hasChallenger := gameLobby.ChallengerId != ""
-		selector := fmt.Sprintf("game-%s", gameLobby.Id)
-		var status string
-		if gameLobby.Status == "open" || gameLobby.Status == "created" {
-			status = "Waiting for Challenger..."
-		} else {
-			status = "Game is Full!"
-		}
+	isHost := gameLobby.HostId == sessionId
+	hasChallenger := gameLobby.ChallengerId != ""
+	gameSelector := fmt.Sprintf("game-%s", gameLobby.Id)
 
-		// Decide which color classes to use
-		colorClass := "bg-base-300 text-base-content"
-		if isHost {
-			colorClass = "bg-base-100 text-primary-content"
-		}
+	var status string
+	switch {
+	case isHost && (gameLobby.Status == "open" || gameLobby.Status == "created"):
+		status = "Waiting for Challenger..."
+	case isHost && (gameLobby.Status == "full" || gameLobby.Status == "in-progress"):
+		status = "Game is Ready!"
+	case !isHost && (gameLobby.Status == "open" || gameLobby.Status == "created"):
+		status = "Waiting for Challenger..."
+	case !isHost && (gameLobby.Status == "full" || gameLobby.Status == "in-progress"):
+		status = "Game is Full!"
+	default:
+		status = "Unknown"
+	}
 
-		// Common card classes
-		baseClasses := "p-6 shadow-lg flex flex-col items-center justify-between w-full min-h-[220px] rounded-none"
-		cardClasses := baseClasses + " " + colorClass
+	colorClass := "bg-base-300 text-base-content"
+	if isHost {
+		colorClass = "bg-base-100 text-primary-content"
+	}
+
+	baseClasses := "p-6 shadow-lg flex flex-col items-center justify-between w-full min-h-[220px] rounded-none"
+	cardClasses := baseClasses + " " + colorClass
+
+	showJoinButton := false
+	if (isHost && gameLobby.Status == "full") ||
+		(gameLobby.Status == "open" || gameLobby.Status == "created") {
+		showJoinButton = true
+	}
 	}}
-	<!-- Game Card -->
-	<div id={ selector } class={ cardClasses }>
-		<!-- Game ID & Host -->
-		<p class="tracking-widest text-secondary-content text-base sm:text-md text-center">
+	<div id={ gameSelector } class={ cardClasses }>
+		<p class="tracking-widest text-secondary-content sm:text-md text-center">
 			Game: { gameLobby.Id }
 		</p>
-		<p class="tracking-widest text-secondary-content text-base sm:text-md text-center">
+		<p class="tracking-widest text-secondary-content sm:text-md text-center">
 			Hosted By:
 			if isHost {
 				You!
@@ -42,23 +53,22 @@ templ DashboardItem(gameLobby *GameLobby, sessionId string) {
 			}
 		</p>
 		if hasChallenger {
-			<p class="tracking-widest text-secondary-content text-base sm:text-md text-center">
+			<p class="tracking-widest text-secondary-content sm:text-md text-center">
 				Challenger: { gameLobby.ChallengerName }
 			</p>
 		}
-		<p class="tracking-widest text-secondary-content text-base sm:text-md text-center">
+		<p class="tracking-widest text-secondary-content sm:text-md text-center">
 			Status: { status }
 		</p>
-		<!-- Buttons Section -->
 		<div class="flex flex-col items-center justify-center w-full gap-2">
-			<!-- Join Button -->
-			<button
-				class="btn btn-primary rounded-none flex items-center justify-center text-center text-primary-content w-full m-2 h-12 px-4"
-				data-on-click={ datastar.PostSSE("/api/dashboard/%s/join", gameLobby.Id) }
-			>
-				Join
-			</button>
-			<!-- Delete Button (Only for Host) -->
+			if showJoinButton {
+				<button
+					class="btn btn-primary rounded-none flex items-center justify-center text-center text-primary-content w-full m-2 h-12 px-4"
+					data-on-click={ datastar.PostSSE("/api/dashboard/%s/join", gameLobby.Id) }
+				>
+					Join
+				</button>
+			}
 			if isHost {
 				<button
 					class="btn btn-secondary rounded-none flex items-center justify-center text-center text-secondary-content w-full m-2 h-12 px-4"
