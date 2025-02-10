@@ -41,51 +41,20 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 	sessionStore := sessions.NewCookieStore([]byte("session-secret"))
 	sessionStore.MaxAge(int(24 * time.Hour / time.Second))
 
-	// Create NATS client
 	nc, err := ns.Client()
 	if err != nil {
 		err = fmt.Errorf("error creating nats client: %w", err)
 		return nil, err
 	}
 
-	// Access JetStream
 	js, err := jetstream.New(nc)
 	if err != nil {
 		err = fmt.Errorf("error creating nats client: %w", err)
 		return nil, err
 	}
 
-	_, err = js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
-		Bucket:      "gameLobbies",
-		Description: "Datastar Tic Tac Toe Game",
-		Compression: true,
-		TTL:         time.Hour,
-		MaxBytes:    16 * 1024 * 1024,
-	})
-	if err != nil {
-		return cleanup, fmt.Errorf("error creating key value: %w", err)
-	}
-
-	_, err = js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
-		Bucket:      "gameBoards",
-		Description: "Datastar Tic Tac Toe Game",
-		Compression: true,
-		TTL:         time.Hour,
-		MaxBytes:    16 * 1024 * 1024,
-	})
-	if err != nil {
-		return cleanup, fmt.Errorf("error creating key value: %w", err)
-	}
-
-	_, err = js.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{
-		Bucket:      "users",
-		Description: "Datastar Tic Tac Toe Game",
-		Compression: true,
-		TTL:         time.Hour,
-		MaxBytes:    16 * 1024 * 1024,
-	})
-	if err != nil {
-		return cleanup, fmt.Errorf("error creating key value: %w", err)
+	if err := createKeyValueBuckets(ctx, js); err != nil {
+		return cleanup, err
 	}
 
 	if err := errors.Join(
@@ -119,7 +88,7 @@ func getSessionId(store sessions.Store, r *http.Request) (string, error) {
 	}
 	id, ok := sess.Values["id"].(string)
 	if !ok || id == "" {
-		return "", nil // No session ID exists
+		return "", nil
 	}
 	return id, nil
 }
@@ -135,4 +104,31 @@ func deleteSessionId(store sessions.Store, w http.ResponseWriter, r *http.Reques
 		http.Error(w, fmt.Sprintf("failed to save session: %v", err), http.StatusInternalServerError)
 		return
 	}
+}
+
+func createKeyValueBuckets(ctx context.Context, js jetstream.JetStream) error {
+	createBucket := func(bucket, desc string) error {
+		_, err := js.CreateOrUpdateKeyValue(ctx, jetstream.KeyValueConfig{
+			Bucket:      bucket,
+			Description: desc,
+			Compression: true,
+			TTL:         time.Hour,
+			MaxBytes:    16 * 1024 * 1024,
+		})
+		if err != nil {
+			return fmt.Errorf("error creating bucket %q: %w", bucket, err)
+		}
+		return nil
+	}
+
+	if err := createBucket("gameLobbies", "Datastar Tic Tac Toe Game"); err != nil {
+		return err
+	}
+	if err := createBucket("gameBoards", "Datastar Tic Tac Toe Game"); err != nil {
+		return err
+	}
+	if err := createBucket("users", "Datastar Tic Tac Toe Game"); err != nil {
+		return err
+	}
+	return nil
 }

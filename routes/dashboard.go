@@ -119,8 +119,8 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 
 					// Optional: if you want to refuse re-joins once there's a challenger
 					if gameLobby.ChallengerId != "" && gameLobby.ChallengerId != sessionID {
-						sse.ExecuteScript("alert('Another player has already joined. Game is full.');")
 						sse.Redirect("/dashboard")
+						sse.ExecuteScript("alert('Another player has already joined. Game is full.');")
 						return
 					}
 
