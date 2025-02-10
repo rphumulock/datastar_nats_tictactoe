@@ -20,45 +20,90 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 
 	usersKV, err := js.KeyValue(ctx, "users")
 	if err != nil {
-		return fmt.Errorf("failed to get users key value: %w", err)
+		return fmt.Errorf("failed to get 'users' KV bucket: %w", err)
 	}
 
 	saveUser := func(ctx context.Context, user *components.User) error {
-		b, err := json.Marshal(user)
+		data, err := json.Marshal(user)
 		if err != nil {
-			return fmt.Errorf("failed to marshal mvc: %w", err)
+			return fmt.Errorf("failed to marshal user: %w", err)
 		}
-		if _, err := usersKV.Put(ctx, user.SessionId, b); err != nil {
-			return fmt.Errorf("failed to put key value: %w", err)
+		if _, err := usersKV.Put(ctx, user.SessionId, data); err != nil {
+			return fmt.Errorf("failed to store user in KV: %w", err)
 		}
 		return nil
 	}
 
-	userSession := func(w http.ResponseWriter, r *http.Request, u *components.InlineValidationUser) (*components.User, error) {
-		ctx := r.Context()
+	userSession := func(w http.ResponseWriter, r *http.Request, inlineUser *components.InlineValidationUser) (*components.User, error) {
+		sessCtx := r.Context()
 
-		SessionId, err := createSessionId(store, r, w)
+		sessionID, err := createSessionId(store, r, w)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get session id: %w", err)
 		}
 
 		user := &components.User{
-			SessionId: SessionId,
-			Name:      u.Name,
+			SessionId: sessionID,
+			Name:      inlineUser.Name,
 		}
-		if err := saveUser(ctx, user); err != nil {
-			return nil, fmt.Errorf("failed to save mvc: %w", err)
+
+		if err := saveUser(sessCtx, user); err != nil {
+			return nil, fmt.Errorf("failed to save user: %w", err)
 		}
 		return user, nil
 	}
 
+	userValidation := func(u *components.InlineValidationUser) bool {
+		return len(u.Name) >= 2
+	}
+
+	loadInlineUser := func(r *http.Request) (*components.InlineValidationUser, error) {
+		inlineUser := &components.InlineValidationUser{}
+		if err := datastar.ReadSignals(r, inlineUser); err != nil {
+			return nil, err
+		}
+		return inlineUser, nil
+	}
+
+	handleGetLoginPage := func(w http.ResponseWriter, r *http.Request) {
+		inlineUser, err := loadInlineUser(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		sse := datastar.NewSSE(w, r)
+		isNameValid := userValidation(inlineUser)
+		sse.MergeFragmentTempl(
+			components.InlineValidationUserComponent(inlineUser, isNameValid),
+			datastar.WithSelectorID("login"),
+		)
+	}
+
+	handlePostLogin := func(w http.ResponseWriter, r *http.Request) {
+		inlineUser, err := loadInlineUser(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if _, err := userSession(w, r, inlineUser); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		sse := datastar.NewSSE(w, r)
+		sse.Redirect("/dashboard")
+	}
+
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		user, err := getSessionId(store, r)
+		sessionID, err := getSessionId(store, r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if user != "" {
+
+		if sessionID != "" {
 			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 			return
 		}
@@ -66,40 +111,8 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 	})
 
 	router.Route("/api/index", func(indexRouter chi.Router) {
-
-		userValidation := func(u *components.InlineValidationUser) (isNameValid bool) {
-			isNameValid = len(u.Name) >= 2
-			return isNameValid
-		}
-
-		indexRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			u := &components.InlineValidationUser{}
-			if err := datastar.ReadSignals(r, u); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			isNameValid := userValidation(u)
-			sse := datastar.NewSSE(w, r)
-			sse.MergeFragmentTempl(
-				components.InlineValidationUserComponent(u, isNameValid),
-				datastar.WithSelectorID("login"),
-			)
-		})
-
-		indexRouter.Post("/login", func(w http.ResponseWriter, r *http.Request) {
-			u := &components.InlineValidationUser{}
-			if err := datastar.ReadSignals(r, u); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			if _, err := userSession(w, r, u); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			sse := datastar.NewSSE(w, r)
-			sse.Redirect("/dashboard")
-		})
-
+		indexRouter.Get("/", handleGetLoginPage)
+		indexRouter.Post("/login", handlePostLogin)
 	})
 
 	return nil
