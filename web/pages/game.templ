@@ -67,7 +67,7 @@ templ Game(gameLobby *components.GameLobby, gameState *components.GameState, ses
 				</div>
 				<!-- Game Board -->
 				<div
-					class="flex flex-grow items-center justify-center bg-base-300 mt-2 overflow-y-auto max-h-[75vh] w-full"
+					class="flex flex-grow items-center justify-center bg-base-100 mt-2 overflow-y-auto max-h-[75vh] w-full"
 					data-on-load={ datastar.GetSSE("/api/game/%s/watch", gameLobby.Id) }
 				>
 					@components.GameBoard(gameState, gameLobby, sessionId)
