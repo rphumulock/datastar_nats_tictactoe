@@ -85,7 +85,7 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 	if err := errors.Join(
 		setupIndexRoute(router, sessionStore, js),
 		setupDashboardRoute(router, sessionStore, js),
-		setupGameRoute(router, sessionStore, js),
+		// setupGameRoute(router, sessionStore, js),
 	); err != nil {
 		return cleanup, fmt.Errorf("error setting up routes: %w", err)
 	}

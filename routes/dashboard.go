@@ -209,7 +209,6 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 		})
 
 		dashboardRouter.Get("/watch", func(w http.ResponseWriter, r *http.Request) {
-			sse := datastar.NewSSE(w, r)
 			sessionId, err := getSessionId(store, r)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -225,82 +224,105 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 			}
 			defer watcher.Stop()
 
-			historicalMode := true
+			var dashboardItems []components.GameLobby
 
+			sse := datastar.NewSSE(w, r)
 			for update := range watcher.Updates() {
-
 				if update == nil {
-					fmt.Println("End of historical updates. Now receiving live updates...")
-					historicalMode = false
+					c := components.DashboardList(dashboardItems, sessionId)
+					if err := sse.MergeFragmentTempl(c); err != nil {
+						sse.ConsoleError(err)
+					}
+					dashboardItems = []components.GameLobby{}
 					continue
 				}
 
 				switch update.Operation() {
 				case jetstream.KeyValuePut:
-
 					var gameLobby components.GameLobby
 					if err := json.Unmarshal(update.Value(), &gameLobby); err != nil {
 						log.Printf("Error unmarshalling update value: %v", err)
-						return
-					}
-
-					c := components.DashboardItem(&gameLobby, sessionId)
-
-					if historicalMode {
-
-						sse.RemoveFragments("#game-"+update.Key(),
-							datastar.WithRemoveSettleDuration(1*time.Millisecond),
-							datastar.WithRemoveUseViewTransitions(false),
-						)
-
-						if err := sse.MergeFragmentTempl(c,
-							datastar.WithSelectorID("list-container"),
-							datastar.WithMergeAppend(),
-						); err != nil {
-							sse.ConsoleError(err)
-						}
-
-					} else { // if live mode
-
-						switch gameLobby.Status {
-						case "created":
-							// For newly created lobbies, just append a new fragment
-							if err := sse.MergeFragmentTempl(
-								c,
-								datastar.WithSelectorID("list-container"),
-								datastar.WithMergeAppend(),
-							); err != nil {
-								sse.ConsoleError(err)
-							}
-
-						case "open", "full":
-							// For open or full lobbies, morph the existing card
-							if err := sse.MergeFragmentTempl(
-								c,
-								datastar.WithSelectorID("game-"+update.Key()),
-								datastar.WithMergeMorph(),
-							); err != nil {
-								sse.ConsoleError(err)
-							}
-						}
-
-					}
-
-				case jetstream.KeyValueDelete:
-
-					if historicalMode {
-						log.Printf("Ignoring historical delete for key: %s", update.Key())
 						continue
 					}
 
-					sse.RemoveFragments("#game-"+update.Key(),
-						datastar.WithRemoveSettleDuration(1*time.Millisecond),
-						datastar.WithRemoveUseViewTransitions(false),
-					)
-
+					dashboardItems = append(dashboardItems, gameLobby)
 				}
-
 			}
+
+			// for update := range watcher.Updates() {
+
+			// 	if update == nil {
+			// 		fmt.Println("End of historical updates. Now receiving live updates...")
+			// 		historicalMode = false
+			// 		continue
+			// 	}
+
+			// 	switch update.Operation() {
+			// 	case jetstream.KeyValuePut:
+
+			// 		var gameLobby components.GameLobby
+			// 		if err := json.Unmarshal(update.Value(), &gameLobby); err != nil {
+			// 			log.Printf("Error unmarshalling update value: %v", err)
+			// 			return
+			// 		}
+
+			// 		c := components.DashboardItem(&gameLobby, sessionId)
+
+			// 		if historicalMode {
+
+			// 			sse.RemoveFragments("#game-"+update.Key(),
+			// 				datastar.WithRemoveSettleDuration(1*time.Millisecond),
+			// 				datastar.WithRemoveUseViewTransitions(false),
+			// 			)
+
+			// 			if err := sse.MergeFragmentTempl(c,
+			// 				datastar.WithSelectorID("list-container"),
+			// 				datastar.WithMergeAppend(),
+			// 			); err != nil {
+			// 				sse.ConsoleError(err)
+			// 			}
+
+			// 		} else { // if live mode
+
+			// 			switch gameLobby.Status {
+			// 			case "created":
+			// 				// For newly created lobbies, just append a new fragment
+			// 				if err := sse.MergeFragmentTempl(
+			// 					c,
+			// 					datastar.WithSelectorID("list-container"),
+			// 					datastar.WithMergeAppend(),
+			// 				); err != nil {
+			// 					sse.ConsoleError(err)
+			// 				}
+
+			// 			case "open", "full":
+			// 				// For open or full lobbies, morph the existing card
+			// 				if err := sse.MergeFragmentTempl(
+			// 					c,
+			// 					datastar.WithSelectorID("game-"+update.Key()),
+			// 					datastar.WithMergeMorph(),
+			// 				); err != nil {
+			// 					sse.ConsoleError(err)
+			// 				}
+			// 			}
+
+			// 		}
+
+			// 	case jetstream.KeyValueDelete:
+
+			// 		if historicalMode {
+			// 			log.Printf("Ignoring historical delete for key: %s", update.Key())
+			// 			continue
+			// 		}
+
+			// 		sse.RemoveFragments("#game-"+update.Key(),
+			// 			datastar.WithRemoveSettleDuration(1*time.Millisecond),
+			// 			datastar.WithRemoveUseViewTransitions(false),
+			// 		)
+
+			// 	}
+
+			// }
 
 		})
 

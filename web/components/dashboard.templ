@@ -88,3 +88,15 @@ templ DashboardItem(gameLobby *GameLobby, sessionId string) {
 		</div>
 	</div>
 }
+
+templ DashboardList(list []GameLobby, sessionId string) {
+	<div
+		id="list-container"
+		class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full overflow-y-auto"
+		style="max-height: 75vh;"
+	>
+		for _, listItem := range list {
+			@DashboardItem(&listItem, sessionId)
+		}
+	</div>
+}

@@ -46,7 +46,7 @@ func Index() templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 1)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"flex flex-col min-h-screen max-h-screen overflow-hidden\"><nav class=\"bg-base-300 text-base-content py-4 shadow-lg\"><div class=\"container mx-auto flex items-center justify-between px-6\"><div class=\"text-2xl font-extrabold tracking-widest uppercase text-secondary-content\">Tic Tac Toe</div></div></nav><main class=\"min-h-screen flex flex-col items-center justify-center flex-grow gap-6\"><div id=\"login\" data-on-load=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -59,7 +59,7 @@ func Index() templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 2)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\"></div></main></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
