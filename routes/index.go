@@ -34,7 +34,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 		return nil
 	}
 
-	userSession := func(w http.ResponseWriter, r *http.Request, inlineUser *components.InlineValidationUser) (*components.User, error) {
+	userSession := func(w http.ResponseWriter, r *http.Request, inlineUser *components.InlineValidationUserName) (*components.User, error) {
 		sessCtx := r.Context()
 
 		sessionID, err := createSessionId(store, r, w)
@@ -53,12 +53,12 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 		return user, nil
 	}
 
-	userValidation := func(u *components.InlineValidationUser) bool {
+	userValidation := func(u *components.InlineValidationUserName) bool {
 		return len(u.Name) >= 2
 	}
 
-	loadInlineUser := func(r *http.Request) (*components.InlineValidationUser, error) {
-		inlineUser := &components.InlineValidationUser{}
+	loadInlineUser := func(r *http.Request) (*components.InlineValidationUserName, error) {
+		inlineUser := &components.InlineValidationUserName{}
 		if err := datastar.ReadSignals(r, inlineUser); err != nil {
 			return nil, err
 		}
@@ -75,7 +75,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 		sse := datastar.NewSSE(w, r)
 		isNameValid := userValidation(inlineUser)
 		sse.MergeFragmentTempl(
-			components.InlineValidationUserComponent(inlineUser, isNameValid),
+			components.InlineValidationUserNameComponent(inlineUser, isNameValid),
 		)
 	}
 

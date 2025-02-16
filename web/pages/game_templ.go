@@ -14,7 +14,7 @@ import (
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-func Game(gameLobby *components.GameLobby, gameState *components.GameState, sessionId string) templ.Component {
+func Game(gameState *components.GameState, gameName, hostname, challengerName string, isHost bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -47,34 +47,30 @@ func Game(gameLobby *components.GameLobby, gameState *components.GameState, sess
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<!-- Full-Screen Container --> <div class=\"flex flex-col min-h-screen max-h-screen overflow-hidden\"><!-- Navigation Bar --><nav class=\"bg-base-300 text-base-content py-4 shadow-lg\"><div class=\"container mx-auto flex items-center justify-between px-6\"><!-- Left: Game Title --><div class=\"text-xl sm:text-2xl font-extrabold tracking-widest uppercase text-secondary-content\">Tic Tac Toe</div></div></nav><!-- Main Content --><main id=\"main-container\" class=\"flex flex-col flex-grow w-full p-2 h-screen\" data-on-load=\"")
+			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 1)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.GetSSE("/api/game/%s/watch", gameLobby.Id))
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(datastar.GetSSE("/api/game/%s/watch", gameState.Id))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/pages/game.templ`, Line: 26, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/pages/game.templ`, Line: 11, Col: 73}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\"><!-- Game Board -->")
+			templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 2)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = components.GameBoard(gameState, gameLobby, sessionId).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</main></div>")
+			templ_7745c5c3_Err = components.GameBoard(gameState, gameName, hostname, challengerName, isHost).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return templ_7745c5c3_Err
 		})
-		templ_7745c5c3_Err = layouts.Base().Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = layouts.LoggedIn(hostname).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -5,41 +5,22 @@ import (
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-templ GameBoard(gameState *GameState, gameLobby *GameLobby, sessionId string) {
-	{{
-		var host string
-		if gameLobby.HostId == sessionId {
-			host = "You!"
-		} else {
-			host = gameLobby.HostName
-		}
-	}}
-	{{
-		var challenger string
-		if gameLobby.ChallengerId == sessionId {
-			challenger = "You!"
-		} else {
-			challenger = gameLobby.ChallengerName
-		}
-	}}
+templ GameBoard(gameState *GameState, gameName, hostName, challengerName string, isHost bool) {
 	<div id="gameboard">
-		<!-- Title and Buttons Section -->
 		<div class="flex flex-col sm:flex-row justify-between items-center p-4 bg-accent shadow-md w-full rounded-lg border border-accent-content mb-4">
-			<!-- Game Info -->
 			<div class="flex flex-col sm:flex-row gap-4 items-center w-full sm:w-auto text-center">
 				<div class="text-sm sm:text-lg font-bold text-secondary-content">
-					🎮 Game: <span class="text-primary">{ gameLobby.Id }</span>
+					🎮 Game: <span class="text-primary">{ gameName }</span>
 				</div>
 				<div class="text-sm sm:text-lg font-bold text-secondary-content">
-					🏠 Host: <span class="text-primary">{ host }</span>
+					🏠 Host: <span class="text-primary">{ hostName }</span>
 				</div>
 				<div class="text-sm sm:text-lg font-bold text-secondary-content">
-					⚔️ Challenger: <span class="text-primary">{ challenger }</span>
+					⚔️ Challenger: <span class="text-primary">{ challengerName }</span>
 				</div>
 			</div>
-			<!-- Action Buttons -->
 			<div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-4 sm:mt-0">
-				if (sessionId == gameLobby.HostId) {
+				if (isHost) {
 					<a
 						class="btn btn-secondary px-6 py-2 text-center w-full sm:w-auto shadow-md transition-all duration-300 hover:scale-105 hover:bg-secondary-focus"
 						href="/dashboard"
@@ -49,7 +30,7 @@ templ GameBoard(gameState *GameState, gameLobby *GameLobby, sessionId string) {
 				} else {
 					<button
 						class="btn btn-secondary px-6 py-2 text-center w-full sm:w-auto shadow-md transition-all duration-300 hover:scale-105 hover:bg-secondary-focus"
-						data-on-click={ datastar.PostSSE("/api/game/%s/leave", gameLobby.Id) }
+						data-on-click={ datastar.PostSSE("/api/game/%s/leave", gameState.Id) }
 					>
 						🚪 Leave Game
 					</button>
@@ -57,21 +38,16 @@ templ GameBoard(gameState *GameState, gameLobby *GameLobby, sessionId string) {
 			</div>
 		</div>
 		<div class="relative flex items-center justify-center w-full">
-			<!-- Game Board Grid -->
 			<div class="grid grid-cols-3 grid-rows-3 gap-2 w-full max-w-[600px] aspect-square bg-base-300 p-4 shadow-lg">
-				if gameState.Winner != "" {
-					@GameWinner(sessionId, gameState, gameLobby)
-				} else {
-					for i, cell := range gameState.Board {
-						@Cell(gameState.Id, cell, i, gameState, sessionId)
-					}
+				for i, cell := range gameState.Board {
+					@Cell(gameState.Id, cell, i)
 				}
 			</div>
 		</div>
 	</div>
 }
 
-templ Cell(id string, cell string, i int, gameState *GameState, sessionId string) {
+templ Cell(id string, cell string, i int) {
 	<button
 		id={ "cell-" + fmt.Sprintf("%d", i) }
 		class="w-full h-full bg-secondary border-base-content border-4 flex items-center justify-center text-5xl text-secondary-content font-bold cursor-pointer aspect-square transition-transform duration-300 ease-in-out hover:scale-105 hover:bg-secondary-focus"
@@ -85,41 +61,41 @@ templ Cell(id string, cell string, i int, gameState *GameState, sessionId string
 	</button>
 }
 
-templ GameWinner(sessionId string, gameState *GameState, gameLobby *GameLobby) {
-	<div
-		class="absolute inset-0 flex flex-col items-center justify-center bg-green-600 bg-opacity-90 text-white z-10 p-6 rounded-lg shadow-xl transition-all animate-fade-in"
-		aria-live="assertive"
-		role="dialog"
-	>
-		if (gameState.Winner == "TIE") {
-			<h1 class="text-5xl sm:text-6xl font-extrabold mb-4 animate-bounce text-center">
-				🤝 It's a Tie! 🤝
-			</h1>
-		} else {
-			<h1 class="text-5xl sm:text-6xl font-extrabold mb-4 animate-bounce text-center">
-				🎉 { gameState.Winner } Wins! 🎉
-			</h1>
-		}
-		<div class="flex flex-col sm:flex-row gap-4 w-full max-w-[80%] sm:max-w-[60%] items-center justify-center">
-			if (sessionId == gameLobby.HostId) {
-				<button
-					class="btn btn-primary w-full sm:w-auto px-6 py-3 rounded-md shadow-md transition-all hover:scale-105"
-					data-on-click={ datastar.PostSSE("/api/game/%s/reset", gameState.Id) }
-				>
-					Play Again 🔄
-				</button>
-			}
-			<a class="btn btn-secondary w-full sm:w-auto px-6 py-3 rounded-md shadow-md transition-all hover:scale-105" href="/">
-				Back to Dashboard 🏠
-			</a>
-			if (sessionId != gameLobby.HostId) {
-				<button
-					class="btn btn-secondary w-full sm:w-auto px-6 py-3 rounded-md shadow-md transition-all hover:scale-105"
-					data-on-click={ datastar.PostSSE("/api/game/%s/leave", gameState.Id) }
-				>
-					Leave Game 🚪
-				</button>
-			}
-		</div>
-	</div>
-}
+// templ GameWinner(sessionId string, gameState *GameState, gameLobby *GameLobby) {
+// 	<div
+// 		class="absolute inset-0 flex flex-col items-center justify-center bg-green-600 bg-opacity-90 text-white z-10 p-6 rounded-lg shadow-xl transition-all animate-fade-in"
+// 		aria-live="assertive"
+// 		role="dialog"
+// 	>
+// 		if (gameState.Winner == "TIE") {
+// 			<h1 class="text-5xl sm:text-6xl font-extrabold mb-4 animate-bounce text-center">
+// 				🤝 It's a Tie! 🤝
+// 			</h1>
+// 		} else {
+// 			<h1 class="text-5xl sm:text-6xl font-extrabold mb-4 animate-bounce text-center">
+// 				🎉 { gameState.Winner } Wins! 🎉
+// 			</h1>
+// 		}
+// 		<div class="flex flex-col sm:flex-row gap-4 w-full max-w-[80%] sm:max-w-[60%] items-center justify-center">
+// 			if (sessionId == gameLobby.HostId) {
+// 				<button
+// 					class="btn btn-primary w-full sm:w-auto px-6 py-3 rounded-md shadow-md transition-all hover:scale-105"
+// 					data-on-click={ datastar.PostSSE("/api/game/%s/reset", gameState.Id) }
+// 				>
+// 					Play Again 🔄
+// 				</button>
+// 			}
+// 			<a class="btn btn-secondary w-full sm:w-auto px-6 py-3 rounded-md shadow-md transition-all hover:scale-105" href="/">
+// 				Back to Dashboard 🏠
+// 			</a>
+// 			if (sessionId != gameLobby.HostId) {
+// 				<button
+// 					class="btn btn-secondary w-full sm:w-auto px-6 py-3 rounded-md shadow-md transition-all hover:scale-105"
+// 					data-on-click={ datastar.PostSSE("/api/game/%s/leave", gameState.Id) }
+// 				>
+// 					Leave Game 🚪
+// 				</button>
+// 			}
+// 		</div>
+// 	</div>
+// }

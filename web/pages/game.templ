@@ -6,28 +6,9 @@ import (
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-templ Game(gameLobby *components.GameLobby, gameState *components.GameState, sessionId string) {
-	@layouts.Base() {
-		<!-- Full-Screen Container -->
-		<div class="flex flex-col min-h-screen max-h-screen overflow-hidden">
-			<!-- Navigation Bar -->
-			<nav class="bg-base-300 text-base-content py-4 shadow-lg">
-				<div class="container mx-auto flex items-center justify-between px-6">
-					<!-- Left: Game Title -->
-					<div class="text-xl sm:text-2xl font-extrabold tracking-widest uppercase text-secondary-content">
-						Tic Tac Toe
-					</div>
-				</div>
-			</nav>
-			<!-- Main Content -->
-			<main
-				id="main-container"
-				class="flex flex-col flex-grow w-full p-2 h-screen"
-				data-on-load={ datastar.GetSSE("/api/game/%s/watch", gameLobby.Id) }
-			>
-				<!-- Game Board -->
-				@components.GameBoard(gameState, gameLobby, sessionId)
-			</main>
-		</div>
+templ Game(gameState *components.GameState, gameName, hostname, challengerName string, isHost bool) {
+	@layouts.LoggedIn(hostname) {
+		<div data-on-load={ datastar.GetSSE("/api/game/%s/watch", gameState.Id) }></div>
+		@components.GameBoard(gameState, gameName, hostname, challengerName, isHost)
 	}
 }
