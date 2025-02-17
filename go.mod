@@ -2,19 +2,17 @@ module github.com/rphumulock/datastar_nats_tictactoe
 
 go 1.23.3
 
-require (
-	golang.org/x/sync v0.10.0
-)
+require golang.org/x/sync v0.10.0
 
 require (
 	github.com/a-h/templ v0.3.819
 	github.com/benbjohnson/hashfs v0.2.2
-	github.com/delaneyj/toolbelt v0.3.15
+	github.com/delaneyj/toolbelt v0.3.16
 	github.com/go-chi/chi/v5 v5.2.0
 	github.com/gorilla/sessions v1.4.0
-	github.com/nats-io/nats-server/v2 v2.10.24 // indirect
+	github.com/nats-io/nats-server/v2 v2.10.24
 	github.com/nats-io/nats.go v1.38.0
-	github.com/starfederation/datastar v1.0.0-beta.1
+	github.com/starfederation/datastar v1.0.0-beta.7
 )
 
 require (
@@ -28,6 +26,7 @@ require (
 	github.com/go-rod/rod v0.116.2 // indirect
 	github.com/goccy/go-json v0.10.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/igrmk/treemap/v2 v2.0.1 // indirect
@@ -50,15 +49,15 @@ require (
 	github.com/ysmood/gson v0.7.3 // indirect
 	github.com/ysmood/leakless v0.9.0 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67 // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/crypto v0.32.0 // indirect
+	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8 // indirect
+	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
-	golang.org/x/time v0.8.0 // indirect
-	google.golang.org/protobuf v1.36.0 // indirect
-	modernc.org/libc v1.61.4 // indirect
-	modernc.org/mathutil v1.6.0 // indirect
-	modernc.org/memory v1.8.0 // indirect
-	modernc.org/sqlite v1.34.3 // indirect
+	golang.org/x/time v0.9.0 // indirect
+	google.golang.org/protobuf v1.36.2 // indirect
+	modernc.org/libc v1.61.7 // indirect
+	modernc.org/mathutil v1.7.1 // indirect
+	modernc.org/memory v1.8.1 // indirect
+	modernc.org/sqlite v1.34.4 // indirect
 	zombiezen.com/go/sqlite v1.4.0 // indirect
 )

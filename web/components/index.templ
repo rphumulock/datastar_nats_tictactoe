@@ -21,7 +21,7 @@ templ inlineValidationFieldComponent(label, field string, isValid bool, isNotVal
 	</div>
 }
 
-templ InlineValidationUserComponent(u *InlineValidationUser, isNameValid bool) {
+templ InlineValidationUserNameComponent(u *InlineValidationUserName, isNameValid bool) {
 	<div id="login" data-signals__ifmissing={ templ.JSONString(u) }>
 		<h1 class="text-4xl font-bold text-accent tracking-wide text-center">
 			Ready to Play?

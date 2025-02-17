@@ -1,62 +1,12 @@
 package pages
 
 import (
+	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
 	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
-	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
 templ Dashboard(name string) {
-	@layouts.Base() {
-		<!-- Full-Screen Container -->
-		<div class="flex flex-col min-h-screen max-h-screen overflow-hidden">
-			<!-- Navigation Bar -->
-			<nav class="bg-base-300 text-base-content py-4 shadow-lg">
-				<div class="container mx-auto flex items-center justify-between px-6">
-					<!-- Left: Game Title -->
-					<div class="text-2xl font-extrabold tracking-widest uppercase text-secondary-content">
-						Tic Tac Toe
-					</div>
-					<!-- Center: Welcome Message -->
-					<h1 class="text-base sm:text-xl font-semibold text-primary-content text-center flex-1">
-						Welcome, { name }
-					</h1>
-				</div>
-			</nav>
-			<!-- Main Content -->
-			<main class="flex flex-col flex-grow w-full p-4 overflow-hidden">
-				<!-- Title and Buttons Section -->
-				<div class="flex flex-col sm:flex-row justify-between items-center p-4 bg-accent shadow-md w-full mb-4">
-					<div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-						<button
-							class="btn btn-primary rounded-none flex items-center justify-center text-center text-primary-content px-4 py-2 sm:px-6 sm:py-3 w-full sm:w-auto"
-							data-on-click={ datastar.PostSSE("/api/dashboard/create") }
-						>
-							Create Game
-						</button>
-						<button
-							class="btn btn-secondary rounded-none px-4 py-2 sm:px-6 sm:py-3 text-secondary-content w-full sm:w-auto"
-							data-on-click={ datastar.PostSSE("/api/dashboard/logout") }
-						>
-							Logout
-						</button>
-						if (name == "admin") {
-							<button
-								class="btn btn-error rounded-none flex items-center justify-center text-center text-error-content px-4 py-2 sm:px-6 sm:py-3 w-full sm:w-auto"
-								data-on-click={ datastar.DeleteSSE("/api/dashboard/purge") }
-							>
-								Delete Games
-							</button>
-						}
-					</div>
-				</div>
-				<!-- Game List -->
-				<div data-on-load={ datastar.GetSSE("/api/dashboard/watch") }></div>
-				<div
-					id="list-container"
-					class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full overflow-y-auto"
-					style="max-height: 75vh;"
-				></div>
-			</main>
-		</div>
+	@layouts.LoggedIn(name) {
+		@components.Dashboard(name)
 	}
 }

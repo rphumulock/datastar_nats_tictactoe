@@ -59,6 +59,7 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 				Compression: true,
 				TTL:         time.Hour,
 				MaxBytes:    16 * 1024 * 1024,
+				History:     2,
 			})
 			if err != nil {
 				return fmt.Errorf("error creating bucket %q: %w", bucket, err)

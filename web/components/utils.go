@@ -1,6 +1,6 @@
 package components
 
-type InlineValidationUser struct {
+type InlineValidationUserName struct {
 	Name string `json:"name"`
 }
 
@@ -10,12 +10,10 @@ type User struct {
 }
 
 type GameLobby struct {
-	Id             string `json:"id"`
-	HostId         string `json:"host_id"`
-	HostName       string `json:"host_name"`
-	ChallengerId   string `json:"challenger_id"`
-	ChallengerName string `json:"challenger_name"`
-	Status         string `json:"status"`
+	Id           string `json:"id"`
+	Name         string `json:"name"`
+	HostId       string `json:"host_id"`
+	ChallengerId string `json:"challenger_id"`
 }
 
 type GameState struct {

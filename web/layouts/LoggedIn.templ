@@ -1,0 +1,21 @@
+package layouts
+
+templ LoggedIn(name string) {
+	@Base() {
+		<div class="flex flex-col min-h-screen max-h-screen overflow-hidden">
+			<nav class="bg-base-300 text-base-content py-4 shadow-lg rounded-md">
+				<div class="container mx-auto flex items-center justify-between px-6">
+					<div class="text-2xl font-extrabold tracking-widest uppercase text-secondary-content">
+						Tic Tac Toe
+					</div>
+					<h1 class="text-base sm:text-xl font-semibold text-primary-content text-center flex-1">
+						Welcome, { name }
+					</h1>
+				</div>
+			</nav>
+			<main class="flex flex-col flex-grow w-full p-2 h-screen">
+				{ children... }
+			</main>
+		</div>
+	}
+}

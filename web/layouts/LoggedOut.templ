@@ -1,0 +1,18 @@
+package layouts
+
+templ LoggedOut() {
+	@Base() {
+		<div class="flex flex-col min-h-screen max-h-screen overflow-hidden">
+			<nav class="bg-base-300 text-base-content py-4 shadow-lg">
+				<div class="container mx-auto flex items-center justify-between px-6">
+					<div class="text-2xl font-extrabold tracking-widest uppercase text-secondary-content">
+						Tic Tac Toe
+					</div>
+				</div>
+			</nav>
+			<main class="min-h-screen flex flex-col items-center justify-center flex-grow gap-6">
+				{ children... }
+			</main>
+		</div>
+	}
+}
