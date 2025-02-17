@@ -63,14 +63,30 @@ func GetObject[T any](ctx context.Context, kv jetstream.KeyValue, key string) (*
 	return &obj, entry, nil
 }
 
-func storeData(ctx context.Context, kv jetstream.KeyValue, id string, data interface{}) error {
+func PutData(ctx context.Context, kv jetstream.KeyValue, id string, data interface{}) error {
 	bytes, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
+
 	_, err = kv.Put(ctx, id, bytes)
 	if err != nil {
 		return fmt.Errorf("failed to put key-value: %w", err)
 	}
+
+	return nil
+}
+
+func UpdateData(ctx context.Context, kv jetstream.KeyValue, id string, data interface{}, entry jetstream.KeyValueEntry) error {
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	_, err = kv.Update(ctx, id, bytes, entry.Revision())
+	if err != nil {
+		return fmt.Errorf("failed to update key-value: %w", err)
+	}
+
 	return nil
 }

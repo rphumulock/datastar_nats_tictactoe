@@ -23,6 +23,24 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 		return fmt.Errorf("failed to get 'users' KV bucket: %w", err)
 	}
 
+	handleGetIndex := func(w http.ResponseWriter, r *http.Request) {
+		sessionID, err := getSessionId(store, r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if sessionID != "" {
+			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+			return
+		}
+		pages.Index().Render(r.Context(), w)
+	}
+
+	router.Get("/", handleGetIndex)
+
+	// API
+
 	saveUser := func(ctx context.Context, user *components.User) error {
 		data, err := json.Marshal(user)
 		if err != nil {
@@ -94,20 +112,6 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 		sse := datastar.NewSSE(w, r)
 		sse.Redirect("/dashboard")
 	}
-
-	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		sessionID, err := getSessionId(store, r)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if sessionID != "" {
-			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
-			return
-		}
-		pages.Index().Render(r.Context(), w)
-	})
 
 	router.Route("/api/index", func(indexRouter chi.Router) {
 		indexRouter.Get("/", handleGetLoginComponent)

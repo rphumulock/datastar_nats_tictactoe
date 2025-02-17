@@ -20,14 +20,17 @@ templ DashboardList(list []GameLobby, sessionId string) {
 templ DashboardListItem(gameLobby *GameLobby, sessionId string) {
 	{{
 		isHost := gameLobby.HostId == sessionId
+		isChallenger := gameLobby.ChallengerId == sessionId
 		isFull := gameLobby.ChallengerId != ""
 
 		gameSelector := fmt.Sprintf("game-%s", gameLobby.Id)
-		status := "Open"
-		showJoinButton := !isFull
+		showJoinButton := isHost || isChallenger || !isFull
 
+		var status string
 		if isFull {
 			status = "Game is Ready!"
+		} else {
+			status = "Open"
 		}
 
 		colorClass := "bg-base-300 text-base-content"

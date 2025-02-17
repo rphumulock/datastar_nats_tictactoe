@@ -3,12 +3,11 @@ package pages
 import (
 	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
 	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
-	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-templ Game(gameState *components.GameState, gameName, hostname, challengerName string, isHost bool) {
-	@layouts.LoggedIn(hostname) {
-		<div data-on-load={ datastar.GetSSE("/api/game/%s/watch", gameState.Id) }></div>
-		@components.GameBoard(gameState, gameName, hostname, challengerName, isHost)
+templ Game(currentUser, host, challenger *components.User, gameLobby *components.GameLobby, gameState *components.GameState) {
+	@layouts.LoggedIn(currentUser.Name) {
+		@components.GameControls(currentUser, host, challenger, gameLobby)
+		@components.GameBoard(gameState)
 	}
 }

@@ -5,44 +5,28 @@ import (
 	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
-templ GameBoard(gameState *GameState, gameName, hostName, challengerName string, isHost bool) {
-	<div id="gameboard">
-		<div class="flex flex-col sm:flex-row justify-between items-center p-4 bg-accent shadow-md w-full rounded-lg border border-accent-content mb-4">
-			<div class="flex flex-col sm:flex-row gap-4 items-center w-full sm:w-auto text-center">
-				<div class="text-sm sm:text-lg font-bold text-secondary-content">
-					🎮 Game: <span class="text-primary">{ gameName }</span>
-				</div>
-				<div class="text-sm sm:text-lg font-bold text-secondary-content">
-					🏠 Host: <span class="text-primary">{ hostName }</span>
-				</div>
-				<div class="text-sm sm:text-lg font-bold text-secondary-content">
-					⚔️ Challenger: <span class="text-primary">{ challengerName }</span>
-				</div>
+templ GameControls(currentUser, host, challenger *User, gameLobby *GameLobby) {
+	<div id="gamecontrols" class="flex flex-col sm:flex-row justify-between items-center p-4 bg-accent shadow-md w-full rounded-lg border border-accent-content mb-4">
+		<div class="flex flex-col sm:flex-row gap-4 items-center w-full sm:w-auto text-center">
+			<div class="text-sm sm:text-lg font-bold text-secondary-content">
+				🎮 Game: <span class="text-primary">{ gameLobby.Name }</span>
 			</div>
-			<div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-4 sm:mt-0">
-				if (isHost) {
-					<a
-						class="btn btn-secondary px-6 py-2 text-center w-full sm:w-auto shadow-md transition-all duration-300 hover:scale-105 hover:bg-secondary-focus"
-						href="/dashboard"
-					>
-						🏠 Back to Dashboard
-					</a>
-				} else {
-					<button
-						class="btn btn-secondary px-6 py-2 text-center w-full sm:w-auto shadow-md transition-all duration-300 hover:scale-105 hover:bg-secondary-focus"
-						data-on-click={ datastar.PostSSE("/api/game/%s/leave", gameState.Id) }
-					>
-						🚪 Leave Game
-					</button>
-				}
+			<div class="text-sm sm:text-lg font-bold text-secondary-content">
+				🏠 Host: <span class="text-primary">{ host.Name }</span>
+			</div>
+			<div class="text-sm sm:text-lg font-bold text-secondary-content">
+				⚔️ Challenger: <span class="text-primary">{ challenger.Name }</span>
 			</div>
 		</div>
-		<div class="relative flex items-center justify-center w-full">
-			<div class="grid grid-cols-3 grid-rows-3 gap-2 w-full max-w-[600px] aspect-square bg-base-300 p-4 shadow-lg">
-				for i, cell := range gameState.Board {
-					@Cell(gameState.Id, cell, i)
-				}
-			</div>
+	</div>
+}
+
+templ GameBoard(gameState *GameState) {
+	<div id="gameboard" class="relative flex items-center justify-center w-full">
+		<div class="grid grid-cols-3 grid-rows-3 gap-2 w-full max-w-[600px] aspect-square bg-base-300 p-4 shadow-lg">
+			for i, cell := range gameState.Board {
+				@Cell(gameState.Id, cell, i)
+			}
 		</div>
 	</div>
 }
