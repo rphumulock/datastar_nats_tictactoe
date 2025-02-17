@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/sessions"
@@ -71,6 +73,9 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				http.Error(w, fmt.Sprintf("failed to get user: %v", err), http.StatusInternalServerError)
 				return
 			}
+		} else {
+			challenger = &components.User{}
+			challenger.Name = ""
 		}
 
 		gameState, _, err := GetObject[components.GameState](ctx, gameBoardsKV, id)
@@ -82,307 +87,327 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 		pages.Game(currentUser, host, challenger, gameLobby, gameState).Render(r.Context(), w)
 	}
 
-	handleLobbyUpdate := func(update jetstream.KeyValueEntry, sse *datastar.ServerSentEventGenerator, sessionId string) {
-		if update == nil {
-			fmt.Println("End of historical updates. Now receiving live updates...")
-			return
-		}
-
-		switch update.Operation() { // No need for *update
-		case jetstream.KeyValuePut:
-			gameLobby := &components.GameLobby{}
-			if err := json.Unmarshal(update.Value(), gameLobby); err != nil {
-				log.Printf("Error unmarshalling update: %v", err)
-				return
-			}
-
-			currentUser, _, err := GetObject[components.User](ctx, usersKV, sessionId)
-			if err != nil {
-				log.Printf("Error getting host: %v", err)
-				return
-			}
-
-			host, _, err := GetObject[components.User](ctx, usersKV, gameLobby.HostId)
-			if err != nil {
-				log.Printf("Error getting host: %v", err)
-				return
-			}
-
-			var challenger *components.User
-			if gameLobby.ChallengerId != "" {
-				challenger, _, err = GetObject[components.User](ctx, usersKV, gameLobby.ChallengerId)
-				if err != nil {
-					log.Printf("Error getting host: %v", err)
-					return
-				}
-			}
-
-			c := components.GameControls(currentUser, host, challenger, gameLobby)
-			if err := sse.MergeFragmentTempl(c,
-				datastar.WithSelectorID("gamecontrols"),
-				datastar.WithMergeMorph(),
-			); err != nil {
-				sse.ConsoleError(err)
-			}
-
-		case jetstream.KeyValueDelete:
-			sse.Redirect("/")
-		}
-	}
-
-	handleGameUpdate := func(update jetstream.KeyValueEntry, sse *datastar.ServerSentEventGenerator) {
-		if update == nil {
-			fmt.Println("End of historical updates. Now receiving live updates...")
-			return
-		}
-
-		switch update.Operation() { // No need for *update
-		case jetstream.KeyValuePut:
-			gameState := &components.GameState{}
-			if err := json.Unmarshal(update.Value(), gameState); err != nil {
-				log.Printf("Error unmarshalling update: %v", err)
-				return
-			}
-
-			c := components.GameBoard(gameState)
-			if err := sse.MergeFragmentTempl(c,
-				datastar.WithSelectorID("gameboard"),
-				datastar.WithMergeMorph(),
-			); err != nil {
-				sse.ConsoleError(err)
-			}
-
-		case jetstream.KeyValueDelete:
-			sse.Redirect("/")
-		}
-	}
-
 	router.Get("/game/{id}", handleGamePage)
 
-	router.Route("/api/game", func(gameRouter chi.Router) {
+	// API
 
-		gameRouter.Route("/{id}", func(gameIdRouter chi.Router) {
+	router.Route("/api/game/{id}", func(gameRouter chi.Router) {
 
-			gameIdRouter.Get("/watch", func(w http.ResponseWriter, r *http.Request) {
-				sse := datastar.NewSSE(w, r)
-				id := chi.URLParam(r, "id")
-				if id == "" {
-					sse.ExecuteScript("alert('Missing game ID')")
-					sse.Redirect("/dashboard")
-					return
+		checkWinner := func(board []string) string {
+			winningCombinations := [][]int{
+				{0, 1, 2}, // Top row
+				{3, 4, 5}, // Middle row
+				{6, 7, 8}, // Bottom row
+				{0, 3, 6}, // Left column
+				{1, 4, 7}, // Middle column
+				{2, 5, 8}, // Right column
+				{0, 4, 8}, // Top-left to bottom-right diagonal
+				{2, 4, 6}, // Top-right to bottom-left diagonal
+			}
+
+			boardFull := true // Assume the board is full initially
+
+			// Check for a winner and simultaneously check if the board is full
+			for _, combination := range winningCombinations {
+				if board[combination[0]] != "" &&
+					board[combination[0]] == board[combination[1]] &&
+					board[combination[0]] == board[combination[2]] {
+					return board[combination[0]] // Return the winner ("X" or "O")
 				}
+			}
 
-				sessionId, err := getSessionId(store, r)
-				if err != nil || sessionId == "" {
-					http.Redirect(w, r, "/", http.StatusSeeOther)
-					return
+			// Check if the board is full
+			for _, cell := range board {
+				if cell == "" {
+					boardFull = false
+					break
 				}
+			}
 
-				gameWatcher, err := gameBoardsKV.Watch(ctx, id)
-				if err != nil {
-					http.Error(w, fmt.Sprintf("Failed to start watcher: %v", err), http.StatusInternalServerError)
-					return
-				}
-				defer gameWatcher.Stop()
+			if boardFull {
+				return "TIE" // Board is full and no winner
+			}
 
-				gameLobbyWatcher, err := gameLobbiesKV.Watch(ctx, id)
-				if err != nil {
-					http.Error(w, fmt.Sprintf("Failed to start watcher: %v", err), http.StatusInternalServerError)
-					return
-				}
-				defer gameLobbyWatcher.Stop()
+			return "" // No winner yet and moves still possible
+		}
 
-				// Use a single loop with select to handle multiple watchers
-				for {
-					select {
-					case entry, ok := <-gameWatcher.Updates():
-						if !ok {
-							log.Println("Main watcher closed.")
-							return
+		watchGameBoard := func(ctx context.Context, sse *datastar.ServerSentEventGenerator, gameId string) error {
+			gameWatcher, err := gameBoardsKV.Watch(ctx, gameId)
+			if err != nil {
+				return fmt.Errorf("failed to start game watcher: %w", err)
+			}
+			defer gameWatcher.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return nil // Exit if context is canceled
+				case update, ok := <-gameWatcher.Updates():
+					if !ok {
+						return nil // Exit if the channel is closed
+					}
+					if update == nil {
+						log.Println("End of historical updates. Now receiving live updates...")
+						continue
+					}
+
+					switch update.Operation() {
+					case jetstream.KeyValuePut:
+						var gameState components.GameState
+						if err := json.Unmarshal(update.Value(), &gameState); err != nil {
+							log.Printf("Error unmarshalling game state: %v", err)
+							continue
 						}
-						handleGameUpdate(entry, sse)
 
-					case lobbyUpdate, ok := <-gameLobbyWatcher.Updates():
-						if !ok {
-							log.Println("Chat watcher closed.")
-							return
+						log.Printf("Received update for game %v", gameState)
+
+						c := components.GameBoard(&gameState)
+						if err := sse.MergeFragmentTempl(c,
+							datastar.WithSelectorID("gameboard"),
+							datastar.WithMergeMorph(),
+						); err != nil {
+							sse.ConsoleError(err)
 						}
-						handleLobbyUpdate(lobbyUpdate, sse, sessionId)
+
+					case jetstream.KeyValuePurge:
+						sse.Redirect("/")
 					}
 				}
-			})
+			}
+		}
 
-			// gameIdRouter.Post("/toggle/{cell}", func(w http.ResponseWriter, r *http.Request) {
-			// 	sse := datastar.NewSSE(w, r)
-			// 	id := chi.URLParam(r, "id")
-			// 	if id == "" {
-			// 		sse.ExecuteScript("alert('Missing game ID')")
-			// 		sse.Redirect("/dashboard")
-			// 		return
-			// 	}
+		watchGameLobby := func(ctx context.Context, sse *datastar.ServerSentEventGenerator, gameId, sessionId string) error {
+			gameLobbyWatcher, err := gameLobbiesKV.Watch(ctx, gameId)
+			if err != nil {
+				return fmt.Errorf("failed to start game lobby watcher: %w", err)
+			}
+			defer gameLobbyWatcher.Stop()
 
-			// 	sessionId, err := getSessionId(store, r)
-			// 	if err != nil || sessionId == "" {
-			// 		sse.ExecuteScript("alert('Error getting session ID')")
-			// 		sse.Redirect("/")
-			// 		return
-			// 	}
+			for {
+				select {
+				case <-ctx.Done():
+					return nil // Exit if context is canceled
+				case gameLobbyEntry, ok := <-gameLobbyWatcher.Updates():
+					if !ok {
+						return nil // Exit if the channel is closed
+					}
+					if gameLobbyEntry == nil {
+						log.Println("End of historical updates. Now receiving live updates...")
+						continue
+					}
 
-			// 	gameLobby, _, err := GetObject[components.GameLobby](r.Context(), gameLobbiesKV, id)
-			// 	if err != nil {
-			// 		http.Error(w, fmt.Sprintf("failed to get user: %v", err), http.StatusInternalServerError)
-			// 		return
-			// 	}
+					switch gameLobbyEntry.Operation() {
+					case jetstream.KeyValuePut:
+						var gameLobby components.GameLobby
+						if err := json.Unmarshal(gameLobbyEntry.Value(), &gameLobby); err != nil {
+							log.Printf("Error unmarshalling game lobby: %v", err)
+							continue
+						}
 
-			// 	gameState, entry, err := GetObject[components.GameState](r.Context(), gameBoardsKV, id)
-			// 	if err != nil {
-			// 		http.Error(w, fmt.Sprintf("failed to get user: %v", err), http.StatusInternalServerError)
-			// 		return
-			// 	}
+						log.Printf("Received update for game lobby %v", gameLobby)
 
-			// 	cell := chi.URLParam(r, "cell")
-			// 	i, err := strconv.Atoi(cell)
-			// 	if err != nil || i < 0 || i >= len(gameState.Board) {
-			// 		sse.ExecuteScript("alert('Invalid cell index')")
-			// 		return
-			// 	}
+						currentUser, _, err := GetObject[components.User](ctx, usersKV, sessionId)
+						if err != nil {
+							return fmt.Errorf("failed to get current user: %w", err)
+						}
 
-			// 	if gameState.Board[i] != "" {
-			// 		sse.ExecuteScript("alert('Cell already occupied')")
-			// 		return
-			// 	}
+						host, _, err := GetObject[components.User](ctx, usersKV, gameLobby.HostId)
+						if err != nil {
+							return fmt.Errorf("failed to get host user: %w", err)
+						}
 
-			// 	if gameState.XIsNext && sessionId != gameLobby.HostId || !gameState.XIsNext && sessionId != gameLobby.ChallengerId {
-			// 		sse.ExecuteScript("alert('Not your turn')")
-			// 		return
-			// 	}
+						var challenger *components.User
+						if gameLobby.ChallengerId != "" {
+							challenger, _, err = GetObject[components.User](ctx, usersKV, gameLobby.ChallengerId)
+							if err != nil {
+								return fmt.Errorf("failed to get challenger user: %w", err)
+							}
+						} else {
+							challenger = &components.User{Name: ""}
+						}
 
-			// 	if gameState.XIsNext {
-			// 		gameState.Board[i] = "X"
-			// 	} else {
-			// 		gameState.Board[i] = "O"
-			// 	}
-			// 	gameState.XIsNext = !gameState.XIsNext
+						c := components.GameControls(currentUser, host, challenger, &gameLobby)
+						if err := sse.MergeFragmentTempl(c,
+							datastar.WithSelectorID("gamecontrols"),
+							datastar.WithMergeMorph(),
+						); err != nil {
+							sse.ConsoleError(err)
+						}
 
-			// 	winner := checkWinner(gameState.Board[:])
-			// 	if winner == "TIE" {
-			// 		gameState.Winner = "TIE"
-			// 	} else if winner != "" {
-			// 		gameState.Winner = winner
-			// 	}
-
-			// 	b, err := json.Marshal(gameState)
-			// 	if err != nil {
-			// 		http.Error(w, fmt.Sprintf("failed to marshal game state: %v", err), http.StatusInternalServerError)
-			// 		return
-			// 	}
-
-			// 	if _, err := gameBoardsKV.Update(ctx, gameState.Id, b, entry.Revision()); err != nil {
-			// 		http.Error(w, fmt.Sprintf("failed to update game state: %v", err), http.StatusInternalServerError)
-			// 		return
-			// 	}
-			// })
-
-			// gameIdRouter.Post("/reset", func(w http.ResponseWriter, r *http.Request) {
-			// 	id := chi.URLParam(r, "id")
-			// 	if id == "" {
-			// 		http.Error(w, "missing 'id' parameter", http.StatusBadRequest)
-			// 		return
-			// 	}
-
-			// 	gameState, entry, err := GetObject[components.GameState](ctx, gameBoardsKV, id)
-			// 	if err != nil {
-			// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-			// 		return
-			// 	}
-
-			// 	gameState.Board = [9]string{"", "", "", "", "", "", "", "", ""}
-			// 	gameState.Winner = ""
-			// 	gameState.XIsNext = true
-
-			// 	data, err := json.Marshal(gameState)
-			// 	if err != nil {
-			// 		http.Error(w, fmt.Sprintf("failed to marshal game state: %v", err), http.StatusInternalServerError)
-			// 		return
-			// 	}
-			// 	if _, err := gameBoardsKV.Update(ctx, gameState.Id, data, entry.Revision()); err != nil {
-			// 		http.Error(w, fmt.Sprintf("failed to update game state: %v", err), http.StatusInternalServerError)
-			// 		return
-			// 	}
-			// })
-
-			gameIdRouter.Post("/leave", func(w http.ResponseWriter, r *http.Request) {
-				ctx := r.Context()
-				sse := datastar.NewSSE(w, r)
-
-				id := chi.URLParam(r, "id")
-				if id == "" {
-					sse.ExecuteScript("alert('Missing game ID')")
-					sse.Redirect("/dashboard")
-					return
+					case jetstream.KeyValuePurge:
+						sse.Redirect("/")
+					}
 				}
+			}
+		}
 
-				gameLobby, entry, err := GetObject[components.GameLobby](ctx, gameLobbiesKV, id)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
+		handleUpdates := func(w http.ResponseWriter, r *http.Request) {
+			sse := datastar.NewSSE(w, r)
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				sse.ExecuteScript("alert('Missing game ID')")
+				sse.Redirect("/dashboard")
+				return
+			}
+
+			sessionId, err := getSessionId(store, r)
+			if err != nil || sessionId == "" {
+				http.Redirect(w, r, "/", http.StatusSeeOther)
+				return
+			}
+
+			// Create a cancellable context for graceful shutdown
+			ctx, cancel := context.WithCancel(r.Context())
+			defer cancel()
+
+			// Use a WaitGroup to wait for all watchers to finish
+			var wg sync.WaitGroup
+			wg.Add(2) // Two watchers: gameWatcher and gameLobbyWatcher
+
+			// Start gameWatcher
+			go func() {
+				defer wg.Done()
+				if err := watchGameBoard(ctx, sse, id); err != nil {
+					log.Printf("Game board watcher error: %v", err)
 				}
+			}()
 
-				gameLobby.ChallengerId = ""
-				data, err := json.Marshal(gameLobby)
-				if err != nil {
-					http.Error(w, fmt.Sprintf("failed to marshal game lobby: %v", err), http.StatusInternalServerError)
-					return
+			// Start gameLobbyWatcher
+			go func() {
+				defer wg.Done()
+				if err := watchGameLobby(ctx, sse, id, sessionId); err != nil {
+					log.Printf("Game lobby watcher error: %v", err)
 				}
+			}()
 
-				if _, err := gameLobbiesKV.Update(ctx, gameLobby.Id, data, entry.Revision()); err != nil {
-					http.Error(w, fmt.Sprintf("failed to update game lobby: %v", err), http.StatusInternalServerError)
-					return
-				}
+			// Wait for all watchers to finish
+			wg.Wait()
+		}
 
+		handleToggle := func(w http.ResponseWriter, r *http.Request) {
+			sse := datastar.NewSSE(w, r)
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				sse.ExecuteScript("alert('Missing game ID')")
+				sse.Redirect("/dashboard")
+				return
+			}
+
+			sessionId, err := getSessionId(store, r)
+			if err != nil || sessionId == "" {
+				sse.ExecuteScript("alert('Error getting session ID')")
 				sse.Redirect("/")
-			})
+				return
+			}
 
-		})
+			gameLobby, _, err := GetObject[components.GameLobby](r.Context(), gameLobbiesKV, id)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("failed to get user: %v", err), http.StatusInternalServerError)
+				return
+			}
+
+			gameState, entry, err := GetObject[components.GameState](r.Context(), gameBoardsKV, id)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("failed to get user: %v", err), http.StatusInternalServerError)
+				return
+			}
+
+			cell := chi.URLParam(r, "cell")
+			i, err := strconv.Atoi(cell)
+			if err != nil || i < 0 || i >= len(gameState.Board) {
+				sse.ExecuteScript("alert('Invalid cell index')")
+				return
+			}
+
+			if gameState.Board[i] != "" {
+				sse.ExecuteScript("alert('Cell already occupied')")
+				return
+			}
+
+			if gameState.XIsNext && sessionId != gameLobby.HostId || !gameState.XIsNext && sessionId != gameLobby.ChallengerId {
+				sse.ExecuteScript("alert('Not your turn')")
+				return
+			}
+
+			if gameState.XIsNext {
+				gameState.Board[i] = "X"
+			} else {
+				gameState.Board[i] = "O"
+			}
+			gameState.XIsNext = !gameState.XIsNext
+
+			winner := checkWinner(gameState.Board[:])
+			if winner == "TIE" {
+				gameState.Winner = "TIE"
+			} else if winner != "" {
+				gameState.Winner = winner
+			}
+
+			if err := UpdateData(ctx, gameBoardsKV, gameState.Id, gameState, entry); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		handleReset := func(w http.ResponseWriter, r *http.Request) {
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				http.Error(w, "missing 'id' parameter", http.StatusBadRequest)
+				return
+			}
+
+			gameState, entry, err := GetObject[components.GameState](ctx, gameBoardsKV, id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			gameState.Board = [9]string{"", "", "", "", "", "", "", "", ""}
+			gameState.Winner = ""
+			gameState.XIsNext = true
+
+			if err := UpdateData(ctx, gameBoardsKV, gameState.Id, gameState, entry); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		handleLeave := func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			sse := datastar.NewSSE(w, r)
+
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				sse.ExecuteScript("alert('Missing game ID')")
+				sse.Redirect("/dashboard")
+				return
+			}
+
+			gameLobby, entry, err := GetObject[components.GameLobby](ctx, gameLobbiesKV, id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			gameLobby.ChallengerId = ""
+			err = UpdateData(ctx, gameLobbiesKV, gameLobby.Id, gameLobby, entry)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			sse.Redirect("/")
+		}
+
+		gameRouter.Get("/updates", handleUpdates)
+
+		gameRouter.Post("/toggle/{cell}", handleToggle)
+
+		gameRouter.Post("/reset", handleReset)
+
+		gameRouter.Post("/leave", handleLeave)
+
 	})
 
 	return nil
-}
-
-func checkWinner(board []string) string {
-	winningCombinations := [][]int{
-		{0, 1, 2}, // Top row
-		{3, 4, 5}, // Middle row
-		{6, 7, 8}, // Bottom row
-		{0, 3, 6}, // Left column
-		{1, 4, 7}, // Middle column
-		{2, 5, 8}, // Right column
-		{0, 4, 8}, // Top-left to bottom-right diagonal
-		{2, 4, 6}, // Top-right to bottom-left diagonal
-	}
-
-	boardFull := true // Assume the board is full initially
-
-	// Check for a winner and simultaneously check if the board is full
-	for _, combination := range winningCombinations {
-		if board[combination[0]] != "" &&
-			board[combination[0]] == board[combination[1]] &&
-			board[combination[0]] == board[combination[2]] {
-			return board[combination[0]] // Return the winner ("X" or "O")
-		}
-	}
-
-	// Check if the board is full
-	for _, cell := range board {
-		if cell == "" {
-			boardFull = false
-			break
-		}
-	}
-
-	if boardFull {
-		return "TIE" // Board is full and no winner
-	}
-
-	return "" // No winner yet and moves still possible
 }

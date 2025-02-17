@@ -2,7 +2,6 @@ package routes
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -41,36 +40,6 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 
 	// API
 
-	saveUser := func(ctx context.Context, user *components.User) error {
-		data, err := json.Marshal(user)
-		if err != nil {
-			return fmt.Errorf("failed to marshal user: %w", err)
-		}
-		if _, err := usersKV.Put(ctx, user.SessionId, data); err != nil {
-			return fmt.Errorf("failed to store user in KV: %w", err)
-		}
-		return nil
-	}
-
-	userSession := func(w http.ResponseWriter, r *http.Request, inlineUser *components.InlineValidationUserName) (*components.User, error) {
-		sessCtx := r.Context()
-
-		sessionID, err := createSessionId(store, r, w)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get session id: %w", err)
-		}
-
-		user := &components.User{
-			SessionId: sessionID,
-			Name:      inlineUser.Name,
-		}
-
-		if err := saveUser(sessCtx, user); err != nil {
-			return nil, fmt.Errorf("failed to save user: %w", err)
-		}
-		return user, nil
-	}
-
 	userValidation := func(u *components.InlineValidationUserName) bool {
 		return len(u.Name) >= 2
 	}
@@ -95,6 +64,30 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 		sse.MergeFragmentTempl(
 			components.InlineValidationUserNameComponent(inlineUser, isNameValid),
 		)
+	}
+
+	createUser := func(sessionId, name string) *components.User {
+		return &components.User{
+			SessionId: sessionId,
+			Name:      name,
+		}
+	}
+
+	userSession := func(w http.ResponseWriter, r *http.Request, inlineUser *components.InlineValidationUserName) (*components.User, error) {
+		ctx := r.Context()
+
+		SessionId, err := createSessionId(store, r, w)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get session id: %w", err)
+		}
+
+		user := createUser(SessionId, inlineUser.Name)
+
+		if err := PutData(ctx, usersKV, user.SessionId, user); err != nil {
+			return nil, fmt.Errorf("failed to put user data: %w", err)
+		}
+
+		return user, nil
 	}
 
 	handlePostLogin := func(w http.ResponseWriter, r *http.Request) {

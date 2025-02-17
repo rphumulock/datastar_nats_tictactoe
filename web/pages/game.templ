@@ -3,11 +3,14 @@ package pages
 import (
 	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
 	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
+	datastar "github.com/starfederation/datastar/sdk/go"
 )
 
 templ Game(currentUser, host, challenger *components.User, gameLobby *components.GameLobby, gameState *components.GameState) {
 	@layouts.LoggedIn(currentUser.Name) {
-		@components.GameControls(currentUser, host, challenger, gameLobby)
-		@components.GameBoard(gameState)
+		<div data-on-load={ datastar.GetSSE("/api/game/%s/updates", gameLobby.Id) }>
+			@components.GameControls(currentUser, host, challenger, gameLobby)
+			@components.GameBoard(gameState)
+		</div>
 	}
 }

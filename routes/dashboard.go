@@ -239,18 +239,29 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 		historicalMode := true
 		dashboardItems := &[]components.GameLobby{}
 
-		for entry := range watcher.Updates() {
-			if entry == nil {
-				handleHistoricalUpdates(*dashboardItems, sessionId, sse)
-				historicalMode = false
-				continue
-			}
+		for {
+			select {
+			case <-ctx.Done():
+				log.Println("Context canceled, stopping watcher updates")
+				return
+			case entry, ok := <-watcher.Updates():
+				if !ok {
+					log.Println("Watcher updates channel closed")
+					return
+				}
 
-			switch entry.Operation() {
-			case jetstream.KeyValuePut:
-				handleKeyValuePut(ctx, historicalMode, dashboardItems, entry, sessionId, sse)
-			case jetstream.KeyValuePurge:
-				handleKeyValueDelete(historicalMode, entry, sse)
+				if entry == nil {
+					handleHistoricalUpdates(*dashboardItems, sessionId, sse)
+					historicalMode = false
+					continue
+				}
+
+				switch entry.Operation() {
+				case jetstream.KeyValuePut:
+					handleKeyValuePut(ctx, historicalMode, dashboardItems, entry, sessionId, sse)
+				case jetstream.KeyValuePurge:
+					handleKeyValueDelete(historicalMode, entry, sse)
+				}
 			}
 		}
 	}
@@ -317,17 +328,9 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 				return
 			}
 
-			updatedLobby := *gameLobby
-			updatedLobby.ChallengerId = sessionID
+			gameLobby.ChallengerId = sessionID
 
-			updatedBytes, err := json.Marshal(updatedLobby)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("failed to marshal updated lobby: %v", err), http.StatusInternalServerError)
-				return
-			}
-
-			_, err = gameLobbiesKV.Update(ctx, id, updatedBytes, entry.Revision())
-			if err != nil {
+			if err := UpdateData(ctx, gameLobbiesKV, id, gameLobby, entry); err != nil {
 				sse.ExecuteScript("alert('Someone else joined first. This lobby is now full.');")
 				sse.Redirect("/dashboard")
 				return
