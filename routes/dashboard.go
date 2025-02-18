@@ -51,6 +51,7 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 
 		user, _, err := GetObject[components.User](ctx, usersKV, sessionId)
 		if err != nil {
+			deleteSessionId(store, w, r)
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
@@ -323,7 +324,6 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 		if sessionID != gameLobby.HostId {
 
 			if gameLobby.ChallengerId != "" && gameLobby.ChallengerId != sessionID {
-				sse.Redirect("/dashboard")
 				sse.ExecuteScript("alert('Another player has already joined. Game is full.');")
 				return
 			}
@@ -332,7 +332,6 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 
 			if err := UpdateData(ctx, gameLobbiesKV, id, gameLobby, entry); err != nil {
 				sse.ExecuteScript("alert('Someone else joined first. This lobby is now full.');")
-				sse.Redirect("/dashboard")
 				return
 			}
 		}
