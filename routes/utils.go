@@ -12,24 +12,25 @@ import (
 )
 
 func createSessionId(store sessions.Store, r *http.Request, w http.ResponseWriter) (string, error) {
-	sess, err := store.Get(r, "connections")
+	session, err := store.Get(r, "connections")
 	if err != nil {
 		return "", fmt.Errorf("failed to get session: %w", err)
 	}
 	id := toolbelt.NextEncodedID()
-	sess.Values["id"] = id
-	if err := sess.Save(r, w); err != nil {
+	session.Values["id"] = id
+	session.Options.MaxAge = 45 * 60
+	if err := session.Save(r, w); err != nil {
 		return "", fmt.Errorf("failed to save session: %w", err)
 	}
 	return id, nil
 }
 
 func getSessionId(store sessions.Store, r *http.Request) (string, error) {
-	sess, err := store.Get(r, "connections")
+	session, err := store.Get(r, "connections")
 	if err != nil {
 		return "", fmt.Errorf("failed to get session: %w", err)
 	}
-	id, ok := sess.Values["id"].(string)
+	id, ok := session.Values["id"].(string)
 	if !ok || id == "" {
 		return "", nil
 	}
