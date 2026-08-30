@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
+	"github.com/rphumulock/datastar-nats-tictactoe/web/components"
 
 	datastar "github.com/starfederation/datastar-go/datastar"
 )

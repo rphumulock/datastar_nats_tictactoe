@@ -44,8 +44,8 @@ Call-flow diagrams live in [`Diagrams/`](./Diagrams).
 ## Setup
 
 ```shell
-git clone https://github.com/rphumulock/datastar_nats_tictactoe.git
-cd datastar_nats_tictactoe
+git clone https://github.com/rphumulock/datastar-nats-tictactoe.git
+cd datastar-nats-tictactoe
 
 pnpm install
 go mod tidy

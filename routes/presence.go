@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
+	"github.com/rphumulock/datastar-nats-tictactoe/web/components"
 )
 
 // A session is "present" while it holds an open SSE stream - the dashboard list

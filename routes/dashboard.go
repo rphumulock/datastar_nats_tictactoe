@@ -15,8 +15,8 @@ import (
 	"github.com/goombaio/namegenerator"
 	"github.com/gorilla/sessions"
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
-	"github.com/rphumulock/datastar_nats_tictactoe/web/pages"
+	"github.com/rphumulock/datastar-nats-tictactoe/web/components"
+	"github.com/rphumulock/datastar-nats-tictactoe/web/pages"
 
 	datastar "github.com/starfederation/datastar-go/datastar"
 )

@@ -8,7 +8,7 @@ package layouts
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/rphumulock/datastar_nats_tictactoe/web/components"
+import "github.com/rphumulock/datastar-nats-tictactoe/web/components"
 
 func LoggedOut() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {

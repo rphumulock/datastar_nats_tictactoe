@@ -1,4 +1,4 @@
-module github.com/rphumulock/datastar_nats_tictactoe
+module github.com/rphumulock/datastar-nats-tictactoe
 
 go 1.26.0
 
