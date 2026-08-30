@@ -1,147 +1,162 @@
-# NORTHSTAR - A Hypermedia Application Starter Template
+# Datastar NATS Tic Tac Toe
 
-# Stack
+A real-time, multiplayer tic-tac-toe game built as a **hypermedia application**: the
+server owns all state and streams HTML to the browser over SSE. There is no
+client-side application code and no JSON API for the UI — a move is a `POST`, and
+both players' boards update because the server pushes new markup down their open
+streams.
 
-- [Go](https://go.dev/doc/)
-- [NATS](https://docs.nats.io/)
-- [Datastar](https://github.com/@starfederation/datastar)
-- [Templ](https://templ.guide/)
-  - [Tailwind](https://tailwindcss.com/) x [DaisyUI](https://daisyui.com/) x [esbuild](https://esbuild.github.io/)
+State lives entirely in an **embedded NATS JetStream** server running inside the Go
+process. There is no external database and no separate NATS to run; `go build`
+produces one binary that is the whole application.
 
-# Setup
+Originally forked from the [northstar](https://github.com/zangster300/northstar)
+starter template.
 
-1. Clone this repository
+## Stack
+
+| Layer | Tool |
+| --- | --- |
+| Server | [Go](https://go.dev/doc/) + [chi](https://github.com/go-chi/chi) |
+| State | [NATS JetStream KV](https://docs.nats.io/), embedded in-process |
+| Browser updates | [Datastar](https://data-star.dev/) v1.0.3 over SSE |
+| Templates | [Templ](https://templ.guide/) |
+| Styles | [Tailwind](https://tailwindcss.com/) x [DaisyUI](https://daisyui.com/) |
+
+## How it works
+
+1. A player enters a name on `/` and gets a session cookie. A `User` record is
+   written to the `users` bucket.
+2. `/dashboard` opens a long-lived SSE stream (`/api/dashboard/updates`) that
+   watches the `gameLobbies` bucket and re-renders the lobby list on every change.
+   Creating or joining a lobby is a plain `POST`; every connected dashboard sees
+   the result because they are all watching the same bucket.
+3. `/game/{id}` opens a second stream (`/api/game/{id}/updates`) watching that
+   game's board. Clicking a cell `POST`s to `/api/game/{id}/toggle/{cell}`; the
+   server validates the move, writes the new board to `gameBoards`, and both
+   players' streams push the updated markup.
+
+Every SSE stream also heartbeats into a `presence` bucket, which is what makes
+abandoned lobbies detectable — see [Presence and Abandoned Games](#presence-and-abandoned-games).
+
+Call-flow diagrams live in [`Diagrams/`](./Diagrams).
+
+## Setup
 
 ```shell
-git clone https://github.com/zangster300/northstar.git
-```
+git clone https://github.com/rphumulock/datastar_nats_tictactoe.git
+cd datastar_nats_tictactoe
 
-2. Install Dependencies
-
-```shell
 pnpm install
 go mod tidy
 ```
 
-3. Create 🚀
+Requires Go 1.26+, [pnpm](https://pnpm.io/), and [Task](https://taskfile.dev/).
 
-# Development
+## Development
 
-Live Reload is setup out of the box - powered by [Air](https://github.com/air-verse/air) and [templ](https://templ.guide/commands-and-tools/live-reload-with-other-tools#putting-it-all-together)'s proxy server
-
-Use the [live task](./Taskfile.yml#L78) from the [Taskfile](https://taskfile.dev/) to start the server
+Live reload is set up out of the box — [Air](https://github.com/air-verse/air) for
+the Go binary, [templ](https://templ.guide/commands-and-tools/live-reload-with-other-tools)'s
+proxy server for the browser, and Tailwind in watch mode.
 
 ```shell
 task live
 ```
 
-Navigate to [`http://localhost:7331`](http://localhost:7331) in your favorite web browser to begin
+Then open **[`http://localhost:7331`](http://localhost:7331)** — the templ proxy,
+which injects the reload script. The real server is on `8080` behind it.
 
-## Debugging
+> [!IMPORTANT]
+> Point your browser at the **proxy** (`7331`) for live reload, but at the **real
+> server** (`8080`) when you want to watch NATS KV changes surface in realtime —
+> the proxy does not forward SSE cleanly.
 
-The [debug task](<(./Taskfile.yml#L33)>) will launch [delve](https://github.com/go-delve/delve) to begin a debugging session with your project's binary
+To play both sides, open a second browser profile or a private window; the two
+tabs need separate session cookies.
 
-```shell
-task debug
-```
-
-## IDE Support
-
-- [Templ / TailwindCSS Support](https://templ.guide/commands-and-tools/ide-support)
-
-### Visual Studio Code Integration
-
-[Reference](https://code.visualstudio.com/docs/languages/go)
-
-- [launch.json](./.vscode/launch.json)
-- [settings.json](./.vscode/settings.json)
-
-a `Debug Main` configuration has been added to the [launch.json](./.vscode/launch.json) file to set breakpoints
-
-# Starting the Server
+### Running without live reload
 
 ```shell
-task run
+task run     # builds styles + templates, then runs ./tmp/main
 ```
 
-Navigate to [`http://localhost:8080`](http://localhost:8080) in your favorite web browser
+Open [`http://localhost:8080`](http://localhost:8080).
 
-# Deployment
+### Other tasks
 
-## Building an Executable
+| Task | Does |
+| --- | --- |
+| `task build` | Compile styles, generate templates, build `tmp/main` |
+| `task build:templ` | Regenerate `*_templ.go` from `*.templ` |
+| `task build:styles` | Compile `web/styles/styles.css` → `web/static/index.css` |
+| `task debug` | Build, then launch [delve](https://github.com/go-delve/delve) on the binary |
 
-The `task build` [task](./Taskfile.yml#L26) will assemble and build a binary [with static assets embedded](./static_prod.go#L19)
+The templ tasks set [`TEMPL_EXPERIMENT=rawgo`](https://templ.guide/syntax-and-usage/raw-go/)
+for you; you only need it if you invoke `templ generate` by hand.
 
-## Docker
+## Configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `8080` | HTTP listen port (`9001` in the Docker image) |
+| `ADMIN_TOKEN` | random per run | Unlocks `/admin` — see [Admin Panel](#admin-panel) |
+
+The embedded NATS server listens on `127.0.0.1:1234` and is not configurable.
+
+## Routes
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/` | Login page (redirects to `/dashboard` if signed in) |
+| `POST` | `/api/index/login` | Create user + session |
+| `GET` | `/dashboard` | Lobby list |
+| `GET` | `/api/dashboard/updates` | **SSE** — lobby list stream |
+| `POST` | `/api/dashboard/create` | Create a lobby |
+| `POST` | `/api/dashboard/{id}/join` | Join as challenger |
+| `DELETE` | `/api/dashboard/{id}/delete` | Delete own lobby |
+| `POST` | `/api/dashboard/logout` | Sign out |
+| `GET` | `/game/{id}` | Game board |
+| `GET` | `/api/game/{id}/updates` | **SSE** — board stream |
+| `POST` | `/api/game/{id}/toggle/{cell}` | Play a cell |
+| `POST` | `/api/game/{id}/reset` | Reset the board |
+| `POST` | `/api/game/{id}/leave` | Leave the game |
+| `POST` | `/api/session/touch` | Slide the session cookie from an SSE page |
+| `GET` | `/admin` | Admin panel |
+| `POST` | `/api/admin/login` | Exchange `ADMIN_TOKEN` for access |
+| `GET` | `/api/admin/updates` | **SSE** — admin tables stream |
+| `DELETE` | `/api/admin/games/{id}`, `/api/admin/users/{id}` | Delete one record |
+| `POST` | `/api/admin/purge/{orphaned,finished,older,games,users}` | Bulk cleanup |
+
+## Data model
+
+Four KV buckets, all created in [`routes/router.go`](./routes/router.go). Game data
+expires after an hour; presence after 90 seconds.
+
+| Bucket | Key | Value |
+| --- | --- | --- |
+| `users` | session id | `{"name":…,"session_id":…}` |
+| `gameLobbies` | game id | `{"id":…,"name":…,"host_id":…,"host_name":…,"challenger_id":…}` |
+| `gameBoards` | game id | `{"id":…,"board":[9 strings],"turn":bool,"winner":…}` |
+| `presence` | session id | RFC3339 timestamp (TTL is the whole mechanism) |
+
+`host_name` is denormalised into the lobby so a card still renders a name after the
+host's user record expires.
+
+### Inspecting NATS
+
+Install the [nats-cli](https://github.com/nats-io/natscli) and point it at the
+embedded server:
 
 ```shell
-# build an image
-docker build -t northstar:latest .
+export NATS_URL=nats://127.0.0.1:1234
 
-# run the image in a container
-docker run --name northstar -p 8080:9001 northstar:latest
+nats kv ls                            # list buckets
+nats kv ls gameLobbies                # list lobby ids
+nats kv get --raw gameBoards [id]     # read a board
+
+# force a win to watch both browsers update
+nats kv put gameBoards [id] '{"id":"[id]","board":["X","X","X","","","","","",""],"turn":false,"winner":"X"}'
 ```
-
-[Dockerfile](./Dockerfile)
-
-# Contributing
-
-Completely open to PR's and feature requests
-
-# References
-
-## Server
-
-- [go](https://go.dev/)
-- [nats](https://docs.nats.io/)
-- [datastar](https://datastar.fly.dev/)
-- [templ](https://templ.guide/)
-
-> [!IMPORTANT]  
-> The `TODO` example relies on the [`TEMPL_EXPERIMENT=rawgo`](https://templ.guide/syntax-and-usage/raw-go/) environment variable being set
-
-### Embedded NATS
-
-An embedded NATS server that powers the `TODO` application is configured and booted up in the [router.go](./handlers/router.go#L16) file
-
-To interface with it, you should install the [nats-cli](https://github.com/nats-io/natscli)
-
-Here are some commands to inspect and make changes to the bucket backing the `TODO` app:
-
-```shell
-# list key value buckets
-nats kv ls
-
-# list keys in the `todos` bucket
-nats kv ls todos
-
-# get the value for [key]
-nats kv get --raw todos [key]
-
-# put a value into [key]
-nats kv put todos [key] '{"todos":[{"text":"Hello, NATS!","completed":true}],"editingIdx":-1,"mode":0}'
-```
-
-> [!IMPORTANT]  
-> To see these updates take place in realtime within the `TODO` example, make sure your browser is pointed to the real server and not the templ proxy server!
-
-## Client
-
-- [tailwindcss](https://tailwindcss.com/)
-- [daisyui](https://daisyui.com/)
-- [esbuild](https://esbuild.github.io/)
-- [lit-html](https://lit.dev/)
-
-### Web Components x Datastar
-
-[🔗 Web Components Setup](./web/libs/lit-html/README.md)
-
-## Hypermedia Architecture
-
-- [Hypermedia-Driven Applications](https://htmx.org/essays/hypermedia-driven-applications/)
-- [HTMX Sucks](https://htmx.org/essays/htmx-sucks/)
-- [HTMX Sucks (kinda)](https://datastar.fly.dev/essays/htmx_sucks)
-- [Streams All the Way Down](https://datastar.fly.dev/essays/event_streams_all_the_way_down)
 
 ## Feedback Messages
 
@@ -220,3 +235,53 @@ immediate cleanup and for data left over from an earlier run.
 > The embedded NATS server is started without a `StoreDir`, so JetStream falls
 > back to `/tmp/nats/jetstream` and lobbies survive a restart of the app. The KV
 > buckets expire entries after an hour; the panel is for the stretch before that.
+
+## Deployment
+
+### Executable
+
+`task build` assembles the binary with [static assets embedded](./static_prod.go).
+Development builds use the `dev` tag to serve `web/static` from disk instead
+([`static_dev.go`](./static_dev.go)).
+
+### Docker
+
+The [Dockerfile](./Dockerfile) is a three-stage build — Tailwind in Node, the Go
+binary compressed with `upx`, then a `scratch` final image containing only the
+binary. It listens on `9001`.
+
+```shell
+docker build -t datastar-nats-tictactoe:latest .
+docker run --name tictactoe -p 8080:9001 datastar-nats-tictactoe:latest
+```
+
+### Fly.io
+
+[`fly.toml`](./fly.toml) deploys to `datastar-nats-tictactoe.fly.dev` with
+auto-stop/start machines.
+
+```shell
+fly deploy
+```
+
+> [!WARNING]
+> State is in-process. Scaling beyond one machine gives each instance its own
+> embedded NATS, so players on different machines cannot see each other's games.
+> `min_machines_running = 0` also means a cold start drops all in-flight lobbies.
+
+## IDE Support
+
+- [Templ / TailwindCSS support](https://templ.guide/commands-and-tools/ide-support)
+- VS Code: [launch.json](./.vscode/launch.json) ships a `Debug Main` configuration,
+  plus [settings.json](./.vscode/settings.json) and
+  [recommended extensions](./.vscode/extensions.json)
+
+## Contributing
+
+Completely open to PRs and feature requests.
+
+## References
+
+- [Hypermedia-Driven Applications](https://htmx.org/essays/hypermedia-driven-applications/)
+- [Streams All the Way Down](https://data-star.dev/essays/event_streams_all_the_way_down)
+- [Datastar docs](https://data-star.dev/) · [NATS KV](https://docs.nats.io/nats-concepts/jetstream/key-value-store) · [templ](https://templ.guide/)
