@@ -282,6 +282,6 @@ Completely open to PRs and feature requests.
 
 ## References
 
-- [Hypermedia-Driven Applications](https://htmx.org/essays/hypermedia-driven-applications/)
-- [Streams All the Way Down](https://data-star.dev/essays/event_streams_all_the_way_down)
-- [Datastar docs](https://data-star.dev/) · [NATS KV](https://docs.nats.io/nats-concepts/jetstream/key-value-store) · [templ](https://templ.guide/)
+- [Datastar docs](https://data-star.dev/)
+- [NATS KV](https://docs.nats.io/nats-concepts/jetstream/key-value-store)
+- [templ](https://templ.guide/)

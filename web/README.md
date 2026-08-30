@@ -1,33 +1,32 @@
-# Purpose
+# web
 
-This directory holds resources used for the web portion of an application
+Everything the browser is served: templates, styles, and the compiled CSS.
 
-# Organization
+There is no client-side JavaScript in this project. Datastar is loaded from a CDN
+in [`layouts/base.templ`](./layouts/base.templ) and drives the UI entirely through
+`data-*` attributes on server-rendered markup, so there is no bundler step and no
+JS/TS source tree to maintain.
 
-> [!WARNING]  
-> If any pathing is updated, make sure to update the paths across scripts in the `package.json` and `Taskfile.yml` files
+> [!WARNING]
+> If any of these paths change, update `tailwind.config.js`, the `Taskfile.yml`
+> tasks, and the `COPY` lines in the `Dockerfile` to match.
 
-## Components
+## Organization
 
-This directory holds reusable component templates that can be composed across different page layouts
+| Directory | Holds |
+| --- | --- |
+| `components/` | Reusable fragments composed into pages, and the Go helpers and types backing them (`utils.go`, `session.go`, `admin_helpers.go`) |
+| `layouts/` | Page shells — `base.templ` plus the `LoggedIn` / `LoggedOut` wrappers |
+| `pages/` | One template per route: index, dashboard, game, admin |
+| `styles/` | `styles.css`, the Tailwind entrypoint |
+| `static/` | Build output — `index.css`, gitignored and embedded into the binary by [`static_prod.go`](../static_prod.go) |
 
-## Layouts
+## Generated files
 
-This directory is responsible for different layouts across web pages of your site
+`*_templ.go` files are generated from their `.templ` source by `task build:templ`;
+edit the `.templ` and regenerate rather than editing them directly.
 
-## Libs
-
-This directory serves as an entrypoint to be used for storage of any JS/TS libraries needed for the project to run
-
-Currently it is being used to hold the following:
-
-- Datastar as a vendor dependency from the `npm` registry - [NOTE](./libs/datastar/README.md)
-- Web Components powered by Lit-html
-
-## Pages
-
-This directory is responsible for the different pages accessible through your site
-
-## Styles
-
-This directory is responsible for styling, it is currently setup to use [TailwindCSS](https://tailwindcss.com/)
+While `task live` is running, templ rewrites these into watch mode — string
+literals are replaced with `templ.WriteWatchModeString` calls that read from
+gitignored `*_templ.txt` sidecars. That form is for hot reload only and must not
+be committed; run `task build:templ` after stopping the watcher to restore them.
