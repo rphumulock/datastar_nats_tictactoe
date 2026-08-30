@@ -9,10 +9,12 @@ import (
 templ Game(currentUser, host, challenger *components.User, gameLobby *components.GameLobby, gameState *components.GameState) {
 	@layouts.LoggedIn(currentUser.Name) {
 		// The SSE connection lives on this outer div so it survives the morph;
-		// only the inner #game-container is ever replaced.
+		// only the inner #game-container is ever replaced. The keepalive attrs
+		// slide the session cookie while the player sits on the board.
 		<div
 			data-init={ datastar.GetSSE("/api/game/%s/updates", gameLobby.Id) }
 			class="flex flex-col flex-grow w-full"
+			{ components.SessionKeepaliveAttrs()... }
 		>
 			@components.GameContent(currentUser, host, challenger, gameLobby, gameState)
 		</div>

@@ -65,7 +65,11 @@ func startServer(ctx context.Context, logger *slog.Logger, port string) func() e
 		// exists, so guard the defer rather than calling a nil func on return.
 		cleanup, err := routes.SetupRoutes(ctx, logger, router)
 		if cleanup != nil {
-			defer cleanup()
+			defer func() {
+				if err := cleanup(); err != nil {
+					logger.Error("error cleaning up", slog.Any("err", err))
+				}
+			}()
 		}
 		if err != nil {
 			return fmt.Errorf("error setting up routes: %w", err)
@@ -83,7 +87,9 @@ func startServer(ctx context.Context, logger *slog.Logger, port string) func() e
 
 		go func() {
 			<-ctx.Done()
-			srv.Shutdown(context.Background())
+			if err := srv.Shutdown(context.Background()); err != nil {
+				logger.Error("error shutting down server", slog.Any("err", err))
+			}
 		}()
 
 		// ListenAndServe always returns a non-nil error. ErrServerClosed is the

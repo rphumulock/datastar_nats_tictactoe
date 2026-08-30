@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -33,7 +34,9 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 			return
 		}
-		pages.Index().Render(r.Context(), w)
+		if err := pages.Index().Render(r.Context(), w); err != nil {
+			log.Printf("index: render failed: %v", err)
+		}
 	}
 
 	router.Get("/", handleGetIndex)
@@ -61,9 +64,11 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 
 		sse := datastar.NewSSE(w, r)
 		isNameValid := userValidation(inlineUser)
-		sse.PatchElementTempl(
+		if err := sse.PatchElementTempl(
 			components.InlineValidationUserNameComponent(inlineUser, isNameValid),
-		)
+		); err != nil {
+			log.Printf("index: patch failed: %v", err)
+		}
 	}
 
 	createUser := func(sessionId, name string) *components.User {
@@ -102,8 +107,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 			return
 		}
 
-		sse := datastar.NewSSE(w, r)
-		sse.Redirect("/dashboard")
+		sseRedirect(datastar.NewSSE(w, r), "/dashboard")
 	}
 
 	router.Route("/api/index", func(indexRouter chi.Router) {

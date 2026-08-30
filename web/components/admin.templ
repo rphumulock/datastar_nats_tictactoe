@@ -1,0 +1,229 @@
+package components
+
+import (
+	"fmt"
+	datastar "github.com/starfederation/datastar-go/datastar"
+)
+
+templ AdminLogin(failed bool) {
+	<div id="admin-login" class="w-full max-w-sm flex flex-col gap-4 p-6 bg-base-300 rounded-md shadow-lg">
+		<h1 class="text-2xl font-bold text-accent tracking-wide text-center">Admin</h1>
+		<div class="form-control">
+			<label class="label">
+				<span class="label-text">Admin token</span>
+			</label>
+			<input
+				type="password"
+				class={ "input input-bordered text-accent rounded-none", templ.KV("input-error", failed) }
+				data-bind="token"
+				data-on:keydown="evt.key === 'Enter' && @post('/api/admin/login')"
+			/>
+			if failed {
+				<label class="text-sm font-bold text-error">Invalid token.</label>
+			}
+		</div>
+		<button class="btn btn-secondary w-full" data-on:click={ datastar.PostSSE("/api/admin/login") }>
+			Unlock
+		</button>
+	</div>
+}
+
+templ Admin() {
+	<div data-init={ datastar.GetSSE("/api/admin/updates") } data-signals="{olderThanMinutes: 15}">
+		<div class="flex flex-col gap-3 p-4 bg-accent shadow-md w-full mb-4 rounded-md">
+			<div class="flex flex-wrap gap-2 items-center">
+				<button
+					class="btn btn-primary btn-sm rounded-md text-primary-content"
+					data-on:click={ datastar.PostSSE("/api/admin/purge/orphaned") }
+				>
+					🧹 Purge orphaned
+				</button>
+				<button
+					class="btn btn-primary btn-sm rounded-md text-primary-content"
+					data-on:click={ datastar.PostSSE("/api/admin/purge/finished") }
+				>
+					🏁 Purge finished
+				</button>
+				<div class="join">
+					<button
+						class="btn btn-primary btn-sm join-item rounded-md text-primary-content"
+						data-on:click={ datastar.PostSSE("/api/admin/purge/older") }
+					>
+						⏳ Purge older than
+					</button>
+					<input
+						type="number"
+						min="0"
+						class="input input-bordered input-sm join-item w-20 text-accent"
+						data-bind="olderThanMinutes"
+					/>
+					<span class="btn btn-sm join-item no-animation cursor-default">min</span>
+				</div>
+				<button
+					class="btn btn-error btn-sm rounded-md"
+					data-on:click={ confirmed("Delete ALL games?", datastar.PostSSE("/api/admin/purge/games")) }
+				>
+					💣 Delete all games
+				</button>
+				<button
+					class="btn btn-error btn-sm rounded-md"
+					data-on:click={ confirmed("Delete ALL user sessions? Everyone gets logged out.", datastar.PostSSE("/api/admin/purge/users")) }
+				>
+					👥 Delete all users
+				</button>
+				<button
+					class="btn btn-secondary btn-sm rounded-md text-secondary-content ml-auto"
+					data-on:click={ datastar.PostSSE("/api/admin/logout") }
+				>
+					🚪 Lock
+				</button>
+			</div>
+		</div>
+		<div id="admin-container" class="w-full overflow-y-auto" style="max-height: 75vh;"></div>
+	</div>
+}
+
+templ AdminContent(snapshot AdminSnapshot) {
+	<div id="admin-container" class="w-full overflow-y-auto flex flex-col gap-6" style="max-height: 75vh;">
+		<div class="stats stats-vertical sm:stats-horizontal shadow bg-base-300 w-full">
+			@adminStat("Games", fmt.Sprintf("%d", len(snapshot.Games)))
+			@adminStat("Hidden", fmt.Sprintf("%d", snapshot.Orphaned))
+			@adminStat("Finished", fmt.Sprintf("%d", snapshot.Finished))
+			@adminStat("Users", fmt.Sprintf("%d", len(snapshot.Users)))
+		</div>
+		<div class="bg-base-300 rounded-md p-4 shadow-lg">
+			<h2 class="text-lg font-bold text-secondary-content mb-2">🎮 Games</h2>
+			if len(snapshot.Games) == 0 {
+				<p class="text-sm text-base-content">No games.</p>
+			} else {
+				<div class="overflow-x-auto">
+					<table class="table table-zebra table-sm">
+						<thead>
+							<tr class="text-secondary-content">
+								<th>Game</th>
+								<th>Host</th>
+								<th>Challenger</th>
+								<th>Board</th>
+								<th>Age</th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, game := range snapshot.Games {
+								@adminGameRow(game)
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+		</div>
+		<div class="bg-base-300 rounded-md p-4 shadow-lg">
+			<h2 class="text-lg font-bold text-secondary-content mb-2">👤 Users</h2>
+			if len(snapshot.Users) == 0 {
+				<p class="text-sm text-base-content">No users.</p>
+			} else {
+				<div class="overflow-x-auto">
+					<table class="table table-zebra table-sm">
+						<thead>
+							<tr class="text-secondary-content">
+								<th>Name</th>
+								<th>Session</th>
+								<th>Games hosted</th>
+								<th>Age</th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, user := range snapshot.Users {
+								<tr>
+									<td>
+										{ user.Name }
+										if user.Online {
+											<span class="text-success">●</span>
+										} else {
+											<span class="opacity-40">○</span>
+										}
+									</td>
+									<td class="font-mono text-xs">{ user.SessionId }</td>
+									<td>{ fmt.Sprintf("%d", user.Games) }</td>
+									<td>{ user.Age }</td>
+									<td class="text-right">
+										<button
+											class="btn btn-xs btn-error rounded-md"
+											data-on:click={ confirmed(fmt.Sprintf("Delete user %s and their games?", user.Name), datastar.DeleteSSE("/api/admin/users/%s", user.SessionId)) }
+										>
+											🗑️
+										</button>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+templ adminStat(label, value string) {
+	<div class="stat">
+		<div class="stat-title">{ label }</div>
+		<div class="stat-value text-2xl text-secondary-content">{ value }</div>
+	</div>
+}
+
+templ adminGameRow(game AdminGame) {
+	{{
+		status := "🟢 open"
+		if game.Winner == "TIE" {
+			status = "🤝 tie"
+		} else if game.Winner != "" {
+			status = "🏁 won by " + game.Winner
+		} else if game.ChallengerId != "" {
+			status = "⚔️ in play"
+		}
+
+		hostLabel := game.HostName
+		if hostLabel == "" {
+			hostLabel = "unknown"
+		}
+		if !game.HostOnline {
+			hostLabel += " (offline)"
+		}
+
+		challengerLabel := "—"
+		if game.ChallengerId != "" {
+			challengerLabel = game.ChallengerName
+			if challengerLabel == "" {
+				challengerLabel = "unknown"
+			}
+			if !game.ChallengerOnline {
+				challengerLabel += " (offline)"
+			}
+		}
+	}}
+	<tr class={ templ.KV("text-error", game.Orphaned) }>
+		<td>
+			<div class="font-bold">{ game.Name }</div>
+			<div class="font-mono text-xs opacity-60">{ game.Id }</div>
+			if game.Orphaned {
+				<div class="text-xs font-bold">hidden from dashboard</div>
+			}
+		</td>
+		<td>{ hostLabel }</td>
+		<td>{ challengerLabel }</td>
+		<td>
+			<div>{ status }</div>
+			<div class="text-xs opacity-60">{ fmt.Sprintf("%d moves", game.Moves) }</div>
+		</td>
+		<td>{ game.Age }</td>
+		<td class="text-right">
+			<button
+				class="btn btn-xs btn-error rounded-md"
+				data-on:click={ datastar.DeleteSSE("/api/admin/games/%s", game.Id) }
+			>
+				🗑️
+			</button>
+		</td>
+	</tr>
+}

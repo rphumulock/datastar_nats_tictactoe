@@ -1,0 +1,18 @@
+package pages
+
+import (
+	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
+	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
+)
+
+templ AdminLogin() {
+	@layouts.LoggedOut() {
+		@components.AdminLogin(false)
+	}
+}
+
+templ Admin() {
+	@layouts.LoggedIn("Admin") {
+		@components.Admin()
+	}
+}

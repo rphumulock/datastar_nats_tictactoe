@@ -6,7 +6,9 @@ import (
 )
 
 templ Dashboard(name string) {
-	<div data-init={ datastar.GetSSE("/api/dashboard/updates") }>
+	// The keepalive ping is what keeps the session cookie sliding: the SSE stream
+	// below is one long request, so it never re-issues one on its own.
+	<div data-init={ datastar.GetSSE("/api/dashboard/updates") } { SessionKeepaliveAttrs()... }>
 		<div class="flex flex-col sm:flex-row items-center p-4 bg-accent shadow-md w-full mb-4 rounded-md">
 			<div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
 				<button
@@ -50,7 +52,11 @@ templ DashboardListItem(gameLobby *GameLobby, sessionId string) {
 		isFull := gameLobby.ChallengerId != ""
 
 		gameSelector := fmt.Sprintf("game-%s", gameLobby.Id)
-		showJoinButton := isHost || isChallenger || !isFull
+		// Both buttons always render so every card is the same height; they are
+		// disabled rather than dropped when they don't apply. This is presentation
+		// only - the endpoints still need their own checks.
+		canJoin := isHost || isChallenger || !isFull
+		canDelete := isHost
 
 		var status string
 		if isFull && !isHost && !isChallenger {
@@ -63,37 +69,58 @@ templ DashboardListItem(gameLobby *GameLobby, sessionId string) {
 			status = "🟢 Game is Open"
 		}
 
+		hostLabel := gameLobby.HostName
+		if hostLabel == "" {
+			hostLabel = "unknown"
+		}
+		if isHost {
+			hostLabel = "You"
+		}
+
 		colorClass := "bg-base-300 text-base-content"
 		if isHost {
 			colorClass = "bg-base-100 text-primary-content"
 		}
 
 		cardClasses := fmt.Sprintf("p-6 shadow-lg flex flex-col w-full min-h-[220px] rounded-md %s", colorClass)
+
+		const btnBase = "btn rounded-md flex items-center justify-center text-center w-full m-2 h-12 px-4"
+		const btnOff = " btn-disabled opacity-50 cursor-not-allowed"
+
+		joinClasses := btnBase + " btn-primary text-primary-content"
+		if !canJoin {
+			joinClasses += btnOff
+		}
+		deleteClasses := btnBase + " btn-secondary text-secondary-content"
+		if !canDelete {
+			deleteClasses += btnOff
+		}
 	}}
 	<div id={ gameSelector } class={ cardClasses }>
 		<p class="tracking-widest text-secondary-content text-sm font-bold">
 			🎮 Game: { gameLobby.Name }
 		</p>
 		<p class="tracking-widest text-secondary-content text-sm font-bold">
+			👤 Host: { hostLabel }
+		</p>
+		<p class="tracking-widest text-secondary-content text-sm font-bold">
 			📊 Status: { status }
 		</p>
 		<div class="flex flex-col items-center justify-center w-full gap-2">
-			if showJoinButton {
-				<button
-					class="btn btn-primary rounded-md flex items-center justify-center text-center text-primary-content w-full m-2 h-12 px-4"
-					data-on:click={ datastar.PostSSE("/api/dashboard/%s/join", gameLobby.Id) }
-				>
-					🕹️ Join
-				</button>
-			}
-			if isHost {
-				<button
-					class="btn btn-secondary rounded-md flex items-center justify-center text-center text-secondary-content w-full m-2 h-12 px-4"
-					data-on:click={ datastar.DeleteSSE("/api/dashboard/%s/delete", gameLobby.Id) }
-				>
-					🗑️ Delete
-				</button>
-			}
+			<button
+				class={ joinClasses }
+				disabled?={ !canJoin }
+				data-on:click={ datastar.PostSSE("/api/dashboard/%s/join", gameLobby.Id) }
+			>
+				🕹️ Join
+			</button>
+			<button
+				class={ deleteClasses }
+				disabled?={ !canDelete }
+				data-on:click={ datastar.DeleteSSE("/api/dashboard/%s/delete", gameLobby.Id) }
+			>
+				🗑️ Delete
+			</button>
 		</div>
 	</div>
 }
