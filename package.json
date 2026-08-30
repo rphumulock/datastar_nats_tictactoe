@@ -1,7 +1,9 @@
 {
-  "name": "northstar",
-  "version": "0.2.2",
-  "author": "Nicholas Zanghi",
+  "name": "datastar-nats-tictactoe",
+  "version": "0.1.0",
+  "description": "Build tooling for the Tic Tac Toe web assets: Tailwind and DaisyUI styles compiled into web/static.",
+  "private": true,
+  "author": "Peter Humulock",
   "type": "module",
   "devDependencies": {
     "autoprefixer": "^10.4.20",
