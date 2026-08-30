@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/rphumulock/datastar_nats_tictactoe/routes"
+	"github.com/rphumulock/datastar-nats-tictactoe/routes"
 	"golang.org/x/sync/errgroup"
 )
 

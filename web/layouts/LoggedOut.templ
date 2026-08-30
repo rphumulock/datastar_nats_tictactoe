@@ -1,5 +1,7 @@
 package layouts
 
+import "github.com/rphumulock/datastar-nats-tictactoe/web/components"
+
 templ LoggedOut() {
 	@Base() {
 		<div class="flex flex-col min-h-screen max-h-screen overflow-hidden">
@@ -8,6 +10,7 @@ templ LoggedOut() {
 					<div class="text-2xl font-extrabold tracking-widest uppercase text-secondary-content">
 						Tic Tac Toe
 					</div>
+					@components.ThemePicker()
 				</div>
 			</nav>
 			<main class="min-h-screen flex flex-col items-center justify-center flex-grow gap-6">

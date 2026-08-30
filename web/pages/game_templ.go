@@ -9,8 +9,8 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
-	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
-	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
+	"github.com/rphumulock/datastar-nats-tictactoe/web/components"
+	"github.com/rphumulock/datastar-nats-tictactoe/web/layouts"
 	datastar "github.com/starfederation/datastar-go/datastar"
 )
 

@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/delaneyj/toolbelt"
-	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
+	"github.com/rphumulock/datastar-nats-tictactoe/web/components"
 	datastar "github.com/starfederation/datastar-go/datastar"
 )
 

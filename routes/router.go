@@ -124,6 +124,8 @@ func SetupRoutes(
 		// Every app route re-issues the session cookie, so the idle clock only
 		// runs while the player is actually idle.
 		appRouter.Use(slidingSession(sessionStore))
+		// Renders every page in the visitor's chosen theme.
+		appRouter.Use(themeContext)
 
 		setupErr = errors.Join(
 			setupIndexRoute(appRouter, sessionStore, js),
@@ -131,6 +133,7 @@ func SetupRoutes(
 			setupGameRoute(appRouter, sessionStore, js),
 			setupAdminRoute(appRouter, sessionStore, js),
 			setupSessionRoute(appRouter, sessionStore, js),
+			setupThemeRoute(appRouter),
 		)
 	})
 	if setupErr != nil {

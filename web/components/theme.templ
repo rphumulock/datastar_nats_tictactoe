@@ -1,0 +1,43 @@
+package components
+
+import "fmt"
+
+// ThemePicker is a dropdown of every theme in the bundle. Each row previews
+// itself: the swatch carries its own data-theme, and DaisyUI scopes its colour
+// variables by that attribute, so the colours shown are the ones you get.
+templ ThemePicker() {
+	<div class="dropdown dropdown-end">
+		<div tabindex="0" role="button" class="btn btn-sm btn-ghost gap-2" aria-label="Change theme">
+			<iconify-icon icon="mdi:palette-outline" width="18"></iconify-icon>
+			<span class="hidden sm:inline capitalize" data-text="$theme"></span>
+		</div>
+		<ul
+			tabindex="0"
+			class="dropdown-content z-[100] menu flex-nowrap mt-2 p-2 w-56 max-h-96 overflow-y-auto bg-base-200 text-base-content rounded-box shadow-2xl border border-base-300"
+		>
+			for _, theme := range Themes {
+				<li>
+					<button type="button" class="flex items-center justify-between gap-2" data-on-click={ setThemeExpr(theme) }>
+						<span class="capitalize">{ theme }</span>
+						<span class="flex items-center gap-2">
+							<span
+								data-show={ fmt.Sprintf("$theme === '%s'", theme) }
+								class="text-xs font-bold"
+							>&check;</span>
+							@themeSwatch(theme)
+						</span>
+					</button>
+				</li>
+			}
+		</ul>
+	</div>
+}
+
+templ themeSwatch(theme string) {
+	<span data-theme={ theme } class="flex gap-px rounded overflow-hidden border border-base-content/20">
+		<span class="w-2 h-4 bg-primary"></span>
+		<span class="w-2 h-4 bg-secondary"></span>
+		<span class="w-2 h-4 bg-accent"></span>
+		<span class="w-2 h-4 bg-neutral"></span>
+	</span>
+}
