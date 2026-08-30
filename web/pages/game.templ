@@ -3,14 +3,18 @@ package pages
 import (
 	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
 	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
-	datastar "github.com/starfederation/datastar/sdk/go"
+	datastar "github.com/starfederation/datastar-go/datastar"
 )
 
 templ Game(currentUser, host, challenger *components.User, gameLobby *components.GameLobby, gameState *components.GameState) {
 	@layouts.LoggedIn(currentUser.Name) {
-		<div data-on-load={ datastar.GetSSE("/api/game/%s/updates", gameLobby.Id) }>
-			@components.GameControls(currentUser, host, challenger, gameLobby)
-			@components.GameBoard(gameState)
+		// The SSE connection lives on this outer div so it survives the morph;
+		// only the inner #game-container is ever replaced.
+		<div
+			data-init={ datastar.GetSSE("/api/game/%s/updates", gameLobby.Id) }
+			class="flex flex-col flex-grow w-full"
+		>
+			@components.GameContent(currentUser, host, challenger, gameLobby, gameState)
 		</div>
 	}
 }

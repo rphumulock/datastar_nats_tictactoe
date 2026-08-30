@@ -2,11 +2,11 @@ package pages
 
 import (
 	"github.com/rphumulock/datastar_nats_tictactoe/web/layouts"
-	datastar "github.com/starfederation/datastar/sdk/go"
+	datastar "github.com/starfederation/datastar-go/datastar"
 )
 
 templ Index() {
 	@layouts.LoggedOut() {
-		<div id="login" data-on-load={ datastar.GetSSE("/api/index") }></div>
+		<div id="login" data-init={ datastar.GetSSE("/api/index") }></div>
 	}
 }

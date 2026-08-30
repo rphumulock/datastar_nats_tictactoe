@@ -28,7 +28,6 @@ tasks:
     deps:
       - build:styles
       - build:templ
-    parallel: true
 
   # -------------------------------
   # Debugging Tasks
@@ -62,8 +61,9 @@ tasks:
     cmds:
       - mkdir -p tmp # ✅ Ensure tmp/ directory exists
       - |
+        # ✅ Build with the dev tag so static assets are served from disk
         go run github.com/air-verse/air@v1.52.3 \
-        --build.cmd "go build -tags dev -o tmp/main" \  # ✅ Build correctly
+        --build.cmd "go build -tags dev -o tmp/main" \
         --build.bin "tmp/main" \
         --build.delay "20" \
         --build.exclude_dir "node_modules,data,public" \

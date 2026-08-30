@@ -2,7 +2,7 @@ package components
 
 import (
 	"fmt"
-	datastar "github.com/starfederation/datastar/sdk/go"
+	datastar "github.com/starfederation/datastar-go/datastar"
 )
 
 templ inlineValidationFieldComponent(label, field string, isValid bool, isNotValidErrorLabelFmt string, labelArgs ...any) {
@@ -13,7 +13,7 @@ templ inlineValidationFieldComponent(label, field string, isValid bool, isNotVal
 		<input
 			class={ "input input-bordered text-accent rounded-none", templ.KV("input-error", !isValid) }
 			data-bind={ field }
-			data-on-keydown__debounce.500ms={ datastar.GetSSE("/api/index") }
+			data-on:keydown__debounce.500ms={ datastar.GetSSE("/api/index") }
 		/>
 		if !isValid {
 			<label class="text-sm font-bold text-error">{ fmt.Sprintf( isNotValidErrorLabelFmt, labelArgs...) }</label>
@@ -31,7 +31,7 @@ templ InlineValidationUserNameComponent(u *InlineValidationUserName, isNameValid
 			<button
 				disabled?={ !isNameValid }
 				class="btn btn-secondary w-full"
-				data-on-click={ datastar.PostSSE("api/index/login") }
+				data-on:click={ datastar.PostSSE("api/index/login") }
 			>
 				Login
 			</button>

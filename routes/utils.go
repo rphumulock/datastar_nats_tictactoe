@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -90,4 +91,39 @@ func UpdateData(ctx context.Context, kv jetstream.KeyValue, id string, data inte
 	}
 
 	return nil
+}
+
+// UpdateObject re-reads key, applies mutate, and writes the result back with an
+// optimistic revision check. When another writer wins the race it retries against
+// their result, so mutate must be safe to run more than once and should do its
+// validation inside the callback — the state it sees can change between attempts.
+func UpdateObject[T any](ctx context.Context, kv jetstream.KeyValue, key string, mutate func(*T) error) (*T, error) {
+	const maxAttempts = 5
+
+	for range maxAttempts {
+		obj, entry, err := GetObject[T](ctx, kv, key)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := mutate(obj); err != nil {
+			return nil, err
+		}
+
+		bytes, err := json.Marshal(obj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal JSON: %w", err)
+		}
+
+		if _, err := kv.Update(ctx, key, bytes, entry.Revision()); err != nil {
+			if errors.Is(err, jetstream.ErrKeyRevisionMismatch) {
+				continue // someone else wrote first; rebuild on their result
+			}
+			return nil, fmt.Errorf("failed to update key %s: %w", key, err)
+		}
+
+		return obj, nil
+	}
+
+	return nil, fmt.Errorf("failed to update key %s after %d attempts: too much contention", key, maxAttempts)
 }

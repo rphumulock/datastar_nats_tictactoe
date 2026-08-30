@@ -17,7 +17,7 @@ import (
 	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
 	"github.com/rphumulock/datastar_nats_tictactoe/web/pages"
 
-	datastar "github.com/starfederation/datastar/sdk/go"
+	datastar "github.com/starfederation/datastar-go/datastar"
 )
 
 func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.JetStream) error {
@@ -49,7 +49,7 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 			return
 		}
 
-		user, _, err := GetObject[components.User](ctx, usersKV, sessionId)
+		user, _, err := GetObject[components.User](r.Context(), usersKV, sessionId)
 		if err != nil {
 			deleteSessionId(store, w, r)
 			http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -126,21 +126,29 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 		}
 
 		for _, key := range keys {
-			entry, err := gameLobbiesKV.Get(ctx, key)
+			gameLobby, _, err := GetObject[components.GameLobby](ctx, gameLobbiesKV, key)
 			if err != nil {
 				log.Printf("Failed to get value for key %s: %v", key, err)
 				continue
 			}
 
-			var gameLobby components.GameLobby
-			if err := json.Unmarshal(entry.Value(), &gameLobby); err != nil {
-				log.Printf("Error unmarshalling update value: %v", err)
-				return
-			}
-
-			if gameLobby.HostId == sessionId {
-				gameLobbiesKV.Delete(ctx, key)
-				gameBoardsKV.Delete(ctx, key)
+			switch sessionId {
+			case gameLobby.HostId:
+				// The host owns the game, so leaving tears it down.
+				if err := gameLobbiesKV.Delete(ctx, key); err != nil {
+					log.Printf("Failed to delete lobby %s: %v", key, err)
+				}
+				if err := gameBoardsKV.Delete(ctx, key); err != nil {
+					log.Printf("Failed to delete board %s: %v", key, err)
+				}
+			case gameLobby.ChallengerId:
+				// Leaving as the challenger just reopens the lobby.
+				if _, err := UpdateObject(ctx, gameLobbiesKV, key, func(lobby *components.GameLobby) error {
+					lobby.ChallengerId = ""
+					return nil
+				}); err != nil {
+					log.Printf("Failed to clear challenger on lobby %s: %v", key, err)
+				}
 			}
 		}
 
@@ -159,7 +167,7 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 		}
 
 		c := components.DashboardList(dashboardItems, sessionId)
-		if err := sse.MergeFragmentTempl(c); err != nil {
+		if err := sse.PatchElementTempl(c); err != nil {
 			sse.ConsoleError(err)
 		}
 		dashboardItems = nil
@@ -171,9 +179,8 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 			return
 		}
 
-		if err := sse.RemoveFragments("#game-"+update.Key(),
-			datastar.WithRemoveSettleDuration(1*time.Millisecond),
-			datastar.WithRemoveUseViewTransitions(false)); err != nil {
+		if err := sse.RemoveElement("#game-"+update.Key(),
+			datastar.WithoutViewTransitions()); err != nil {
 			sse.ConsoleError(err)
 		}
 
@@ -206,15 +213,14 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 
 		c := components.DashboardListItem(&gameLobby, sessionId)
 		if len(history) == 1 {
-			if err := sse.MergeFragmentTempl(c,
+			if err := sse.PatchElementTempl(c,
 				datastar.WithSelectorID("list-container"),
-				datastar.WithMergeAppend()); err != nil {
+				datastar.WithModeAppend()); err != nil {
 				sse.ConsoleError(err)
 			}
 		} else {
-			if err := sse.MergeFragmentTempl(c,
-				datastar.WithSelectorID("game-"+entry.Key()),
-				datastar.WithMergeMorph()); err != nil {
+			if err := sse.PatchElementTempl(c,
+				datastar.WithSelectorID("game-"+entry.Key())); err != nil {
 				sse.ConsoleError(err)
 			}
 		}
@@ -260,39 +266,11 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 				switch entry.Operation() {
 				case jetstream.KeyValuePut:
 					handleKeyValuePut(ctx, historicalMode, dashboardItems, entry, sessionId, sse)
-				case jetstream.KeyValuePurge:
+				case jetstream.KeyValuePurge, jetstream.KeyValueDelete:
 					handleKeyValueDelete(historicalMode, entry, sse)
 				}
 			}
 		}
-	}
-
-	handlePurge := func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		keys, err := gameLobbiesKV.Keys(ctx)
-		if err != nil {
-			log.Printf("Error listing keys: %v", err)
-			return
-		}
-
-		for _, key := range keys {
-			err = gameLobbiesKV.Purge(ctx, key)
-			if err != nil {
-				log.Printf("Error deleting key '%s': %v", key, err)
-				continue
-			}
-
-			err = gameBoardsKV.Purge(ctx, key)
-			if err != nil {
-				log.Printf("Error deleting key '%s': %v", key, err)
-				continue
-			}
-
-			log.Printf("Deleted key: %s", key)
-		}
-
-		fmt.Fprintln(w, "All games have been purged.")
 	}
 
 	handleJoin := func(w http.ResponseWriter, r *http.Request) {
@@ -365,8 +343,6 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 		dashboardRouter.Post("/logout", handleLogout)
 
 		dashboardRouter.Get("/updates", handleUpdates)
-
-		dashboardRouter.Delete("/purge", handlePurge)
 
 		dashboardRouter.Route("/{id}", func(gameIdRouter chi.Router) {
 

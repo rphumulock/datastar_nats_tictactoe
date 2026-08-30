@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -59,8 +61,12 @@ func startServer(ctx context.Context, logger *slog.Logger, port string) func() e
 
 		router.Handle("/static/*", http.StripPrefix("/static/", static(logger)))
 
+		// SetupRoutes returns a nil cleanup when it fails before the NATS server
+		// exists, so guard the defer rather than calling a nil func on return.
 		cleanup, err := routes.SetupRoutes(ctx, logger, router)
-		defer cleanup()
+		if cleanup != nil {
+			defer cleanup()
+		}
 		if err != nil {
 			return fmt.Errorf("error setting up routes: %w", err)
 		}
@@ -68,6 +74,11 @@ func startServer(ctx context.Context, logger *slog.Logger, port string) func() e
 		srv := &http.Server{
 			Addr:    "0.0.0.0:" + port,
 			Handler: router,
+			// Bound how long a slow or idle client can hold a connection.
+			// No WriteTimeout: it would cut off the long-lived SSE streams.
+			ReadHeaderTimeout: 10 * time.Second,
+			ReadTimeout:       30 * time.Second,
+			IdleTimeout:       120 * time.Second,
 		}
 
 		go func() {
@@ -75,6 +86,11 @@ func startServer(ctx context.Context, logger *slog.Logger, port string) func() e
 			srv.Shutdown(context.Background())
 		}()
 
-		return srv.ListenAndServe()
+		// ListenAndServe always returns a non-nil error. ErrServerClosed is the
+		// expected result of a graceful shutdown, not a failure.
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+		return nil
 	}
 }

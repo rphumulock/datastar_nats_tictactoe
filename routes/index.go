@@ -11,7 +11,7 @@ import (
 	"github.com/rphumulock/datastar_nats_tictactoe/web/components"
 	"github.com/rphumulock/datastar_nats_tictactoe/web/pages"
 
-	datastar "github.com/starfederation/datastar/sdk/go"
+	datastar "github.com/starfederation/datastar-go/datastar"
 )
 
 func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetStream) error {
@@ -61,7 +61,7 @@ func setupIndexRoute(router chi.Router, store sessions.Store, js jetstream.JetSt
 
 		sse := datastar.NewSSE(w, r)
 		isNameValid := userValidation(inlineUser)
-		sse.MergeFragmentTempl(
+		sse.PatchElementTempl(
 			components.InlineValidationUserNameComponent(inlineUser, isNameValid),
 		)
 	}

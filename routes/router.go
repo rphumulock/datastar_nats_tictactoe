@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/delaneyj/toolbelt/embeddednats"
@@ -22,6 +23,12 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 	ns, err := embeddednats.New(ctx, embeddednats.WithNATSServerOptions(&server.Options{
 		JetStream: true,
 		Port:      natsPort,
+		// Only this process talks to the embedded server, so don't expose it
+		// on every interface.
+		Host: "127.0.0.1",
+		// The embedded server installs its own SIGINT/SIGTERM handlers by
+		// default, which race with the signal.NotifyContext in main.
+		NoSigs: true,
 	}))
 
 	if err != nil {
@@ -38,6 +45,10 @@ func SetupRoutes(ctx context.Context, logger *slog.Logger, router chi.Router) (c
 
 	sessionStore := sessions.NewCookieStore([]byte("session-secret"))
 	sessionStore.MaxAge(int(24 * time.Hour / time.Second))
+	// Keep the session cookie out of reach of JavaScript, and stop it riding
+	// along on cross-site requests (gorilla defaults to SameSite=None).
+	sessionStore.Options.HttpOnly = true
+	sessionStore.Options.SameSite = http.SameSiteLaxMode
 
 	nc, err := ns.Client()
 	if err != nil {
