@@ -1,5 +1,19 @@
 # Datastar NATS Tic Tac Toe
 
+## Why this project exists
+
+This is a learning project. I built it to mess around with three things I wanted
+hands-on experience with:
+
+- **[Datastar](https://data-star.dev/)** — driving a whole UI from the server over
+  SSE, with no client-side application code.
+- **CQRS** — separating writes (a move is a `POST` command that validates and
+  writes to a bucket) from reads (SSE streams that watch buckets and re-render).
+- **[NATS JetStream KV](https://docs.nats.io/)** — using a KV store, embedded
+  in-process, as the only source of truth instead of a database.
+
+Tic-tac-toe is just the excuse; it is small enough that the plumbing stays visible.
+
 A real-time, multiplayer tic-tac-toe game built as a **hypermedia application**: the
 server owns all state and streams HTML to the browser over SSE. There is no
 client-side application code and no JSON API for the UI — a move is a `POST`, and
@@ -9,9 +23,6 @@ streams.
 State lives entirely in an **embedded NATS JetStream** server running inside the Go
 process. There is no external database and no separate NATS to run; `go build`
 produces one binary that is the whole application.
-
-Originally forked from the [northstar](https://github.com/zangster300/northstar)
-starter template.
 
 ## Stack
 
