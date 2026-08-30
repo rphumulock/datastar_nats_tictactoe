@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -25,6 +26,7 @@ var (
 	errGameOver    = errors.New("game already decided")
 	errCellTaken   = errors.New("cell already occupied")
 	errNotYourTurn = errors.New("not your turn")
+	errNotPlayer   = errors.New("not a player in this game")
 )
 
 func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStream) error {
@@ -43,6 +45,11 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 	gameBoardsKV, err := js.KeyValue(ctx, "gameBoards")
 	if err != nil {
 		return fmt.Errorf("failed to get game boards key value: %w", err)
+	}
+
+	presenceKV, err := js.KeyValue(ctx, "presence")
+	if err != nil {
+		return fmt.Errorf("failed to get presence key value: %w", err)
 	}
 
 	handleGamePage := func(w http.ResponseWriter, r *http.Request) {
@@ -78,9 +85,17 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 
 		var challenger *components.User
 		if gameLobby.ChallengerId != "" {
-			challenger, _, err = GetObject[components.User](r.Context(), usersKV, gameLobby.ChallengerId)
+			challenger, _, err = GetObject[components.User](
+				r.Context(),
+				usersKV,
+				gameLobby.ChallengerId,
+			)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("failed to get user: %v", err), http.StatusInternalServerError)
+				http.Error(
+					w,
+					fmt.Sprintf("failed to get user: %v", err),
+					http.StatusInternalServerError,
+				)
 				return
 			}
 		} else {
@@ -94,7 +109,10 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 			return
 		}
 
-		pages.Game(currentUser, host, challenger, gameLobby, gameState).Render(r.Context(), w)
+		if err := pages.Game(currentUser, host, challenger, gameLobby, gameState).
+			Render(r.Context(), w); err != nil {
+			log.Printf("game %s: render failed: %v", id, err)
+		}
 	}
 
 	router.Get("/game/{id}", handleGamePage)
@@ -102,7 +120,6 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 	// API
 
 	router.Route("/api/game/{id}", func(gameRouter chi.Router) {
-
 		checkWinner := func(board []string) string {
 			winningCombinations := [][]int{
 				{0, 1, 2}, // Top row
@@ -127,11 +144,8 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 			}
 
 			// Check if the board is full
-			for _, cell := range board {
-				if cell == "" {
-					boardFull = false
-					break
-				}
+			if slices.Contains(board, "") {
+				boardFull = false
 			}
 
 			if boardFull {
@@ -166,7 +180,11 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 
 			challenger := &components.User{}
 			if gameLobby.ChallengerId != "" {
-				challenger, _, err = GetObject[components.User](ctx, usersKV, gameLobby.ChallengerId)
+				challenger, _, err = GetObject[components.User](
+					ctx,
+					usersKV,
+					gameLobby.ChallengerId,
+				)
 				if err != nil {
 					return fmt.Errorf("failed to get challenger user: %w", err)
 				}
@@ -185,7 +203,11 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 			if err != nil {
 				return fmt.Errorf("failed to start watcher: %w", err)
 			}
-			defer watcher.Stop()
+			defer func() {
+				if err := watcher.Stop(); err != nil {
+					log.Printf("game %s: failed to stop watcher: %v", gameId, err)
+				}
+			}()
 
 			for {
 				select {
@@ -207,7 +229,7 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 							log.Printf("game %s: render failed: %v", gameId, err)
 						}
 					case jetstream.KeyValuePurge, jetstream.KeyValueDelete:
-						sse.Redirect("/")
+						sseRedirect(sse, "/")
 						return nil
 					}
 				}
@@ -218,8 +240,7 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 			sse := datastar.NewSSE(w, r)
 			id := chi.URLParam(r, "id")
 			if id == "" {
-				sse.ExecuteScript("alert('Missing game ID')")
-				sse.Redirect("/dashboard")
+				sseRedirect(sse, "/dashboard")
 				return
 			}
 
@@ -232,6 +253,10 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 			// Create a cancellable context for graceful shutdown
 			ctx, cancel := context.WithCancel(r.Context())
 			defer cancel()
+
+			// Sitting on a board counts as being present, so a game in progress
+			// keeps its lobby alive even when nobody is on the dashboard.
+			keepPresence(ctx, presenceKV, sessionId)
 
 			// Use a WaitGroup to wait for all watchers to finish
 			var wg sync.WaitGroup
@@ -262,66 +287,73 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 			sse := datastar.NewSSE(w, r)
 			id := chi.URLParam(r, "id")
 			if id == "" {
-				sse.ExecuteScript("alert('Missing game ID')")
-				sse.Redirect("/dashboard")
+				sseRedirect(sse, "/dashboard")
 				return
 			}
 
 			sessionId, err := getSessionId(store, r)
 			if err != nil || sessionId == "" {
-				sse.ExecuteScript("alert('Error getting session ID')")
-				sse.Redirect("/")
+				sseRedirect(sse, "/")
 				return
 			}
 
 			gameLobby, _, err := GetObject[components.GameLobby](ctx, gameLobbiesKV, id)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("failed to get game lobby: %v", err), http.StatusInternalServerError)
+				http.Error(
+					w,
+					fmt.Sprintf("failed to get game lobby: %v", err),
+					http.StatusInternalServerError,
+				)
 				return
 			}
 
 			i, err := strconv.Atoi(chi.URLParam(r, "cell"))
 			if err != nil {
-				sse.ExecuteScript("alert('Invalid cell index')")
+				toastError(sse, "Invalid cell index")
 				return
 			}
 
 			// Every rule lives inside the mutation so it is re-checked against
 			// the winning state when the other player's move lands first.
-			_, err = UpdateObject(ctx, gameBoardsKV, id, func(gameState *components.GameState) error {
-				if i < 0 || i >= len(gameState.Board) {
-					return errInvalidCell
-				}
-				if gameState.Winner != "" {
-					return errGameOver
-				}
-				if gameState.Board[i] != "" {
-					return errCellTaken
-				}
-				if gameState.XIsNext && sessionId != gameLobby.HostId ||
-					!gameState.XIsNext && sessionId != gameLobby.ChallengerId {
-					return errNotYourTurn
-				}
+			_, err = UpdateObject(
+				ctx,
+				gameBoardsKV,
+				id,
+				func(gameState *components.GameState) error {
+					if i < 0 || i >= len(gameState.Board) {
+						return errInvalidCell
+					}
+					if gameState.Winner != "" {
+						return errGameOver
+					}
+					if gameState.Board[i] != "" {
+						return errCellTaken
+					}
+					if gameState.XIsNext && sessionId != gameLobby.HostId ||
+						!gameState.XIsNext && sessionId != gameLobby.ChallengerId {
+						return errNotYourTurn
+					}
 
-				if gameState.XIsNext {
-					gameState.Board[i] = "X"
-				} else {
-					gameState.Board[i] = "O"
-				}
-				gameState.XIsNext = !gameState.XIsNext
-				gameState.Winner = checkWinner(gameState.Board[:])
-				return nil
-			})
+					if gameState.XIsNext {
+						gameState.Board[i] = "X"
+					} else {
+						gameState.Board[i] = "O"
+					}
+					gameState.XIsNext = !gameState.XIsNext
+					gameState.Winner = checkWinner(gameState.Board[:])
+					return nil
+				},
+			)
 
 			switch {
 			case errors.Is(err, errInvalidCell):
-				sse.ExecuteScript("alert('Invalid cell index')")
+				toastError(sse, "Invalid cell index")
 			case errors.Is(err, errGameOver):
-				sse.ExecuteScript("alert('This game is already over')")
+				toastWarning(sse, "This game is already over")
 			case errors.Is(err, errCellTaken):
-				sse.ExecuteScript("alert('Cell already occupied')")
+				toastWarning(sse, "Cell already occupied")
 			case errors.Is(err, errNotYourTurn):
-				sse.ExecuteScript("alert('Not your turn')")
+				toastWarning(sse, "Not your turn")
 			case err != nil:
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
@@ -334,12 +366,40 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 				return
 			}
 
-			if _, err := UpdateObject(r.Context(), gameBoardsKV, id, func(gameState *components.GameState) error {
-				gameState.Board = [9]string{}
-				gameState.Winner = ""
-				gameState.XIsNext = true
-				return nil
-			}); err != nil {
+			sessionId, err := getSessionId(store, r)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if sessionId == "" {
+				http.Error(w, "not logged in", http.StatusUnauthorized)
+				return
+			}
+
+			gameLobby, _, err := GetObject[components.GameLobby](r.Context(), gameLobbiesKV, id)
+			if err != nil {
+				http.Error(w, "game not found", http.StatusNotFound)
+				return
+			}
+
+			// Only the two players can wipe the board; a spectator holding the
+			// URL should not be able to reset a game out from under them.
+			if sessionId != gameLobby.HostId && sessionId != gameLobby.ChallengerId {
+				http.Error(w, "only the players can reset this game", http.StatusForbidden)
+				return
+			}
+
+			if _, err := UpdateObject(
+				r.Context(),
+				gameBoardsKV,
+				id,
+				func(gameState *components.GameState) error {
+					gameState.Board = [9]string{}
+					gameState.Winner = ""
+					gameState.XIsNext = true
+					return nil
+				},
+			); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -347,24 +407,50 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 
 		handleLeave := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			sse := datastar.NewSSE(w, r)
 
 			id := chi.URLParam(r, "id")
 			if id == "" {
-				sse.ExecuteScript("alert('Missing game ID')")
-				sse.Redirect("/dashboard")
+				http.Error(w, "missing 'id' parameter", http.StatusBadRequest)
 				return
 			}
 
-			if _, err := UpdateObject(ctx, gameLobbiesKV, id, func(gameLobby *components.GameLobby) error {
-				gameLobby.ChallengerId = ""
-				return nil
-			}); err != nil {
+			sessionId, err := getSessionId(store, r)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if sessionId == "" {
+				http.Error(w, "not logged in", http.StatusUnauthorized)
+				return
+			}
+
+			// The check lives inside the mutation because UpdateObject re-reads on
+			// contention: whoever the challenger is when the write lands is the
+			// only one whose seat this call may vacate. The host has no seat to
+			// vacate - they delete the game from the dashboard instead.
+			if _, err := UpdateObject(
+				ctx,
+				gameLobbiesKV,
+				id,
+				func(gameLobby *components.GameLobby) error {
+					if sessionId != gameLobby.ChallengerId {
+						return errNotPlayer
+					}
+					gameLobby.ChallengerId = ""
+					return nil
+				},
+			); err != nil {
+				if errors.Is(err, errNotPlayer) {
+					http.Error(w, "only the challenger can leave this game", http.StatusForbidden)
+					return
+				}
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
-			sse.Redirect("/")
+			// The SSE headers go out only once the response can no longer be an
+			// error status.
+			sseRedirect(datastar.NewSSE(w, r), "/")
 		}
 
 		gameRouter.Get("/updates", handleUpdates)
@@ -374,7 +460,6 @@ func setupGameRoute(router chi.Router, store sessions.Store, js jetstream.JetStr
 		gameRouter.Post("/reset", handleReset)
 
 		gameRouter.Post("/leave", handleLeave)
-
 	})
 
 	return nil

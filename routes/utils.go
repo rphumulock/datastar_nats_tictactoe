@@ -5,21 +5,34 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/delaneyj/toolbelt"
 	"github.com/gorilla/sessions"
 	"github.com/nats-io/nats.go/jetstream"
+	datastar "github.com/starfederation/datastar-go/datastar"
 )
 
+// sseRedirect navigates the browser by patching a script into the page. The
+// write only fails when the client is already gone, which is not worth failing a
+// request over - the handler has nothing left to do either way - but it should
+// not pass silently.
+func sseRedirect(sse *datastar.ServerSentEventGenerator, url string) {
+	if err := sse.Redirect(url); err != nil {
+		log.Printf("failed to redirect to %s: %v", url, err)
+	}
+}
+
 func createSessionId(store sessions.Store, r *http.Request, w http.ResponseWriter) (string, error) {
-	session, err := store.Get(r, "connections")
+	session, err := store.Get(r, playerSessionName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get session: %w", err)
 	}
 	id := toolbelt.NextEncodedID()
 	session.Values["id"] = id
-	session.Options.MaxAge = 45 * 60
+	session.Options.MaxAge = int(sessionMaxAge / time.Second)
 	if err := session.Save(r, w); err != nil {
 		return "", fmt.Errorf("failed to save session: %w", err)
 	}
@@ -27,7 +40,7 @@ func createSessionId(store sessions.Store, r *http.Request, w http.ResponseWrite
 }
 
 func getSessionId(store sessions.Store, r *http.Request) (string, error) {
-	session, err := store.Get(r, "connections")
+	session, err := store.Get(r, playerSessionName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get session: %w", err)
 	}
@@ -39,7 +52,7 @@ func getSessionId(store sessions.Store, r *http.Request) (string, error) {
 }
 
 func deleteSessionId(store sessions.Store, w http.ResponseWriter, r *http.Request) {
-	session, err := store.Get(r, "connections")
+	session, err := store.Get(r, playerSessionName)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to get session: %v", err), http.StatusInternalServerError)
 		return

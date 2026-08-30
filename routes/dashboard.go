@@ -2,10 +2,11 @@ package routes
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -38,6 +39,11 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 		return fmt.Errorf("failed to get users key value: %w", err)
 	}
 
+	presenceKV, err := js.KeyValue(ctx, "presence")
+	if err != nil {
+		return fmt.Errorf("failed to get presence key value: %w", err)
+	}
+
 	handleGetDashboard := func(w http.ResponseWriter, r *http.Request) {
 		sessionId, err := getSessionId(store, r)
 		if err != nil {
@@ -56,7 +62,9 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 			return
 		}
 
-		pages.Dashboard(user.Name).Render(r.Context(), w)
+		if err := pages.Dashboard(user.Name).Render(r.Context(), w); err != nil {
+			log.Printf("dashboard: render failed: %v", err)
+		}
 	}
 
 	router.Get("/dashboard", handleGetDashboard)
@@ -71,11 +79,12 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 		return id, name
 	}
 
-	createGameLobby := func(id, name, sessionId string) components.GameLobby {
+	createGameLobby := func(id, name, sessionId, hostName string) components.GameLobby {
 		return components.GameLobby{
 			Id:           id,
 			Name:         name,
 			HostId:       sessionId,
+			HostName:     hostName,
 			ChallengerId: "",
 		}
 	}
@@ -95,8 +104,15 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		// Best effort: a missing user record just leaves the name blank rather
+		// than blocking creation, which would change this endpoint's semantics.
+		hostName := ""
+		if host, _, err := GetObject[components.User](r.Context(), usersKV, sessionId); err == nil {
+			hostName = host.Name
+		}
+
 		id, name := generateGameDetails()
-		gameLobby := createGameLobby(id, name, sessionId)
+		gameLobby := createGameLobby(id, name, sessionId, hostName)
 		if err := PutData(r.Context(), gameLobbiesKV, id, gameLobby); err != nil {
 			http.Error(w, fmt.Sprintf("failed to store game lobby: %v", err), http.StatusInternalServerError)
 			return
@@ -157,72 +173,49 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 			return
 		}
 		deleteSessionId(store, w, r)
-		sse := datastar.NewSSE(w, r)
-		sse.Redirect("/")
+		sseRedirect(datastar.NewSSE(w, r), "/")
 	}
 
-	handleHistoricalUpdates := func(dashboardItems []components.GameLobby, sessionId string, sse *datastar.ServerSentEventGenerator) {
-		if len(dashboardItems) == 0 {
+	// renderDashboard rebuilds the entire lobby list and morphs #list-container.
+	// One render path covers creates, joins and deletes: morphing patches only
+	// what actually changed, which is simpler and cheaper than tracking per-card
+	// selectors plus a History() lookup on every event.
+	renderDashboard := func(ctx context.Context, sse *datastar.ServerSentEventGenerator, sessionId string) {
+		keys, err := gameLobbiesKV.Keys(ctx)
+		if err != nil && !errors.Is(err, jetstream.ErrNoKeysFound) {
+			log.Printf("Error listing game lobbies: %v", err)
 			return
 		}
 
-		c := components.DashboardList(dashboardItems, sessionId)
-		if err := sse.PatchElementTempl(c); err != nil {
-			sse.ConsoleError(err)
-		}
-		dashboardItems = nil
-	}
-
-	handleKeyValueDelete := func(historicalMode bool, update jetstream.KeyValueEntry, sse *datastar.ServerSentEventGenerator) {
-		if historicalMode {
-			log.Printf("Ignoring historical delete for key: %s", update.Key())
-			return
-		}
-
-		if err := sse.RemoveElement("#game-"+update.Key(),
-			datastar.WithoutViewTransitions()); err != nil {
-			sse.ConsoleError(err)
-		}
-
-	}
-
-	handleKeyValuePut := func(
-		ctx context.Context,
-		historicalMode bool,
-		dashboardItems *[]components.GameLobby,
-		entry jetstream.KeyValueEntry,
-		sessionId string,
-		sse *datastar.ServerSentEventGenerator,
-	) {
-		var gameLobby components.GameLobby
-		if err := json.Unmarshal(entry.Value(), &gameLobby); err != nil {
-			log.Printf("Error unmarshalling update value for key %s: %v", entry.Key(), err)
-			return
-		}
-
-		if historicalMode {
-			*dashboardItems = append(*dashboardItems, gameLobby)
-			return
-		}
-
-		history, err := gameLobbiesKV.History(ctx, entry.Key())
+		// A lobby whose host has no live SSE stream is unplayable: nobody can
+		// join them and only they could delete it. Hide those immediately; the
+		// reaper deletes them a grace period later.
+		present, err := presentSessions(ctx, presenceKV)
 		if err != nil {
-			log.Printf("Error getting history for key %s: %v", entry.Key(), err)
+			log.Printf("Error reading presence: %v", err)
 			return
 		}
 
-		c := components.DashboardListItem(&gameLobby, sessionId)
-		if len(history) == 1 {
-			if err := sse.PatchElementTempl(c,
-				datastar.WithSelectorID("list-container"),
-				datastar.WithModeAppend()); err != nil {
-				sse.ConsoleError(err)
+		lobbies := make([]components.GameLobby, 0, len(keys))
+		for _, key := range keys {
+			lobby, _, err := GetObject[components.GameLobby](ctx, gameLobbiesKV, key)
+			if err != nil {
+				continue // raced with a delete; it just won't be in this render
 			}
-		} else {
-			if err := sse.PatchElementTempl(c,
-				datastar.WithSelectorID("game-"+entry.Key())); err != nil {
-				sse.ConsoleError(err)
+			if _, hostHere := present[lobby.HostId]; !hostHere {
+				continue
 			}
+			lobbies = append(lobbies, *lobby)
+		}
+		// Keys() has no defined order, so sort to keep the cards from reshuffling.
+		sort.Slice(lobbies, func(i, j int) bool { return lobbies[i].Id < lobbies[j].Id })
+
+		// The fragment root carries id="list-container" and the default patch mode
+		// is outer, which matches on that id, so no selector is needed.
+		// A failed patch means the stream is broken, so reporting it back down
+		// that same stream would fail too - log it here instead.
+		if err := sse.PatchElementTempl(components.DashboardList(lobbies, sessionId)); err != nil {
+			log.Printf("dashboard: patch failed: %v", err)
 		}
 	}
 
@@ -236,16 +229,22 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 			return
 		}
 
+		// Heartbeat before the first render, so this session's own lobbies are
+		// never filtered out of the list it is about to receive.
+		keepPresence(ctx, presenceKV, sessionId)
+
 		watcher, err := gameLobbiesKV.WatchAll(ctx)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to start watcher: %v", err), http.StatusInternalServerError)
 			return
 		}
-		defer watcher.Stop()
+		defer func() {
+			if err := watcher.Stop(); err != nil {
+				log.Printf("dashboard: failed to stop watcher: %v", err)
+			}
+		}()
 
-		historicalMode := true
-		dashboardItems := &[]components.GameLobby{}
-
+		live := false
 		for {
 			select {
 			case <-ctx.Done():
@@ -256,18 +255,13 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 					log.Println("Watcher updates channel closed")
 					return
 				}
-
+				// A nil entry marks the end of the historical replay. Render once
+				// there rather than per replayed key, then on every live change.
 				if entry == nil {
-					handleHistoricalUpdates(*dashboardItems, sessionId, sse)
-					historicalMode = false
-					continue
+					live = true
 				}
-
-				switch entry.Operation() {
-				case jetstream.KeyValuePut:
-					handleKeyValuePut(ctx, historicalMode, dashboardItems, entry, sessionId, sse)
-				case jetstream.KeyValuePurge, jetstream.KeyValueDelete:
-					handleKeyValueDelete(historicalMode, entry, sse)
+				if live {
+					renderDashboard(ctx, sse, sessionId)
 				}
 			}
 		}
@@ -302,19 +296,19 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 		if sessionID != gameLobby.HostId {
 
 			if gameLobby.ChallengerId != "" && gameLobby.ChallengerId != sessionID {
-				sse.ExecuteScript("alert('Another player has already joined. Game is full.');")
+				toastWarning(sse, "Another player has already joined. Game is full.")
 				return
 			}
 
 			gameLobby.ChallengerId = sessionID
 
 			if err := UpdateData(ctx, gameLobbiesKV, id, gameLobby, entry); err != nil {
-				sse.ExecuteScript("alert('Someone else joined first. This lobby is now full.');")
+				toastWarning(sse, "Someone else joined first. This lobby is now full.")
 				return
 			}
 		}
 
-		sse.Redirect("/game/" + id)
+		sseRedirect(sse, "/game/"+id)
 	}
 
 	handleDelete := func(w http.ResponseWriter, r *http.Request) {
@@ -323,6 +317,29 @@ func setupDashboardRoute(router chi.Router, store sessions.Store, js jetstream.J
 		id := chi.URLParam(r, "id")
 		if id == "" {
 			http.Error(w, "missing 'id' parameter", http.StatusBadRequest)
+			return
+		}
+
+		sessionId, err := getSessionId(store, r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if sessionId == "" {
+			http.Error(w, "not logged in", http.StatusUnauthorized)
+			return
+		}
+
+		gameLobby, _, err := GetObject[components.GameLobby](ctx, gameLobbiesKV, id)
+		if err != nil {
+			http.Error(w, "game not found", http.StatusNotFound)
+			return
+		}
+
+		// The card's disabled delete button is presentation only; the lobby
+		// belongs to its host and this is where that is actually enforced.
+		if sessionId != gameLobby.HostId {
+			http.Error(w, "only the host can delete this game", http.StatusForbidden)
 			return
 		}
 

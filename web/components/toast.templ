@@ -1,0 +1,24 @@
+package components
+
+// ToastHost is the fixed-position container every toast is appended into. It
+// lives in the base layout so any page can be sent one.
+templ ToastHost() {
+	<div id="toast-host" class="toast toast-top toast-center z-50"></div>
+}
+
+// Toast is one ephemeral message. It removes itself after a few seconds, and a
+// click dismisses it early. Each one carries a fresh id so appending a second
+// message never morphs the first in place - which would leave the new text
+// wearing the old toast's remaining lifetime.
+templ Toast(id, message, kind string) {
+	<div
+		id={ id }
+		class={ "alert shadow-lg cursor-pointer", kind }
+		data-init__delay.5s="el.remove()"
+		data-on:click="el.remove()"
+		role="status"
+		aria-live="polite"
+	>
+		<span>{ message }</span>
+	</div>
+}
