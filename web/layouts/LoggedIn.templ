@@ -1,5 +1,7 @@
 package layouts
 
+import "github.com/rphumulock/datastar_nats_tictactoe/web/components"
+
 templ LoggedIn(name string) {
 	@Base() {
 		<div class="flex flex-col min-h-screen max-h-screen overflow-hidden">
@@ -11,6 +13,7 @@ templ LoggedIn(name string) {
 					<h1 class="text-base sm:text-xl font-semibold text-primary-content text-center flex-1">
 						Welcome, { name }
 					</h1>
+					@components.ThemePicker()
 				</div>
 			</nav>
 			<main class="flex flex-col flex-grow w-full p-2 h-screen">

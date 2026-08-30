@@ -121,6 +121,7 @@ The embedded NATS server listens on `127.0.0.1:1234` and is not configurable.
 | `POST` | `/api/game/{id}/reset` | Reset the board |
 | `POST` | `/api/game/{id}/leave` | Leave the game |
 | `POST` | `/api/session/touch` | Slide the session cookie from an SSE page |
+| `POST` | `/api/theme` | Persist the DaisyUI theme choice to a cookie |
 | `GET` | `/admin` | Admin panel |
 | `POST` | `/api/admin/login` | Exchange `ADMIN_TOKEN` for access |
 | `GET` | `/api/admin/updates` | **SSE** — admin tables stream |
@@ -170,6 +171,26 @@ first in place, and removes itself via `data-init__delay.5s="el.remove()"`.
 Helpers are in [`routes/toast.go`](./routes/toast.go). Messages that would
 accompany a redirect are dropped rather than sent - the navigation discards them
 before they can be read.
+
+## Themes
+
+The nav carries a picker for all 32 DaisyUI themes; each row previews itself,
+since the swatch carries its own `data-theme` and DaisyUI scopes its colour
+variables by that attribute.
+
+The choice is split between the two halves that are each good at one thing.
+Clicking a theme assigns a Datastar signal, and `data-attr` on `<html>` repaints
+from it immediately - no round trip. The same click `@post`s to `/api/theme`,
+which only writes a year-long cookie. Middleware reads that cookie back on every
+request so `<html data-theme>` is already correct in the server's response: the
+theme survives navigation and restarts with no flash of the default on load,
+which is what a client-side store applying the theme after load would give you.
+
+`components.Themes` in [`web/components/theme.go`](./web/components/theme.go) is
+the list, and it has to match the `daisyui.themes` array in `tailwind.config.js`
+- a theme absent from that array has no variables in the bundle and would render
+an uncoloured page. Both the cookie and the posted signal are checked against
+that list before being rendered.
 
 ## Sessions
 
@@ -236,38 +257,26 @@ immediate cleanup and for data left over from an earlier run.
 > back to `/tmp/nats/jetstream` and lobbies survive a restart of the app. The KV
 > buckets expire entries after an hour; the panel is for the stretch before that.
 
-## Deployment
+## Building
 
-### Executable
+`task build` assembles the binary with [static assets embedded](./static_prod.go),
+so the result is a single self-contained file — no NATS to run alongside it and
+no assets to ship. Development builds use the `dev` tag to serve `web/static`
+from disk instead ([`static_dev.go`](./static_dev.go)).
 
-`task build` assembles the binary with [static assets embedded](./static_prod.go).
-Development builds use the `dev` tag to serve `web/static` from disk instead
-([`static_dev.go`](./static_dev.go)).
-
-### Docker
-
-The [Dockerfile](./Dockerfile) is a three-stage build — Tailwind in Node, the Go
-binary compressed with `upx`, then a `scratch` final image containing only the
+The [Dockerfile](./Dockerfile) does the same in three stages — Tailwind in Node,
+the Go binary compressed with `upx`, then a `scratch` image holding only the
 binary. It listens on `9001`.
 
 ```shell
-docker build -t datastar-nats-tictactoe:latest .
-docker run --name tictactoe -p 8080:9001 datastar-nats-tictactoe:latest
+docker build -t tictactoe:latest .
+docker run --name tictactoe -p 8080:9001 tictactoe:latest
 ```
 
-### Fly.io
-
-[`fly.toml`](./fly.toml) deploys to `datastar-nats-tictactoe.fly.dev` with
-auto-stop/start machines.
-
-```shell
-fly deploy
-```
-
-> [!WARNING]
-> State is in-process. Scaling beyond one machine gives each instance its own
-> embedded NATS, so players on different machines cannot see each other's games.
-> `min_machines_running = 0` also means a cold start drops all in-flight lobbies.
+> [!NOTE]
+> State lives in the process. Two instances each get their own embedded NATS and
+> cannot see each other's games, so this runs as a single process — which is all
+> it is meant to do. It is a project to read and tinker with, not to deploy.
 
 ## IDE Support
 

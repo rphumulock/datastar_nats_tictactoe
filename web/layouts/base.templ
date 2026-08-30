@@ -4,7 +4,15 @@ import "github.com/rphumulock/datastar_nats_tictactoe/web/components"
 
 templ Base() {
 	<!DOCTYPE html>
-	<html lang="en" data-theme="retro">
+	// data-theme is rendered from the cookie so the first paint is already
+	// correct; data-attr then keeps it tied to the signal, which is what makes
+	// switching instant instead of a round trip.
+	<html
+		lang="en"
+		data-theme={ components.ThemeFrom(ctx) }
+		data-signals={ components.ThemeSignals(ctx) }
+		data-attr="{'data-theme': $theme}"
+	>
 		<head>
 			<title>Tic+Tac+Toe</title>
 			<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
